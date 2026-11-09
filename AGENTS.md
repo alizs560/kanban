@@ -39,10 +39,10 @@ npm run test   # vitest + Playwright (e2e/board.spec.ts)
 
 ### استقرار روی Vercel
 
-- پروژه‌ی Vercel: **frontend** (تیم `asalami560-6565s-projects`)، مخزن Git: `alizs560/kanban`، **Root Directory** روی `frontend`.
-- آدرس پروداکشن: https://frontend-two-pied-10.vercel.app
-- لینک محلی: `cd frontend` سپس `vercel link` (پوشه‌ی `.vercel` در gitignore است).
-- دیپلوی دستی: `cd frontend && vercel deploy --prod --yes`
+- پروژه‌ی Vercel: **loom** (تیم `asalami560-6565s-projects`)، مخزن Git: `alizs560/kanban`، **Root Directory** روی `frontend`.
+- آدرس پروداکشن: https://loom-kanban.vercel.app (آدرس تیمی: https://loom-asalami560-6565s-projects.vercel.app). `loom.vercel.app` اشغال است و به این پروژه تعلق ندارد.
+- لینک محلی: از **ریشه‌ی مخزن** `vercel link --project loom` (پوشه‌ی `.vercel` در gitignore است).
+- دیپلوی دستی: از ریشه‌ی مخزن `vercel deploy --prod --yes` (نه از داخل `frontend` تنها).
 - CLI سراسری: `vercel` (نسخه ۶۵.x)، اکانت: `asalami560-6565`
 - برای ایجنت: پلاگین `vercel/vercel-plugin` (Cursor) و MCP `https://mcp.vercel.com` در `~/.cursor/mcp.json` — در صورت «Needs login» یک‌بار از UI Cursor احراز هویت کن.
 
