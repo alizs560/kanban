@@ -37,6 +37,15 @@ npm run test   # vitest + Playwright (e2e/board.spec.ts)
 
 ریشه‌ی مخزن `package.json` ندارد؛ همه‌ی دستورات npm از `frontend` اجرا شوند.
 
+### استقرار روی Vercel
+
+- پروژه‌ی Vercel: **frontend** (تیم `asalami560-6565s-projects`)، مخزن Git: `alizs560/kanban`، **Root Directory** روی `frontend`.
+- آدرس پروداکشن: https://frontend-two-pied-10.vercel.app
+- لینک محلی: `cd frontend` سپس `vercel link` (پوشه‌ی `.vercel` در gitignore است).
+- دیپلوی دستی: `cd frontend && vercel deploy --prod --yes`
+- CLI سراسری: `vercel` (نسخه ۶۵.x)، اکانت: `asalami560-6565`
+- برای ایجنت: پلاگین `vercel/vercel-plugin` (Cursor) و MCP `https://mcp.vercel.com` در `~/.cursor/mcp.json` — در صورت «Needs login» یک‌بار از UI Cursor احراز هویت کن.
+
 ## رنگ و ظاهر
 
 **برند LOOM** (دکمه‌ها و تأکیدهای اصلی):
