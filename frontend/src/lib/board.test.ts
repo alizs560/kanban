@@ -3,8 +3,10 @@ import {
   addCard,
   deleteCard,
   initialBoard,
+  matchesCardSearch,
   moveCard,
   renameColumn,
+  updateCard,
 } from "./board";
 
 function freshBoard() {
@@ -34,7 +36,7 @@ describe("board state", () => {
       "done",
     ]);
     expect(board.cards.length).toBeGreaterThan(0);
-    expect(board.columns[0].name.fa).toBe("در صف");
+    expect(board.columns[0].name.fa).toBe("درخواست‌های جدید");
   });
 
   it("adds a trimmed card to an existing column and keeps its entered text across locales", () => {
@@ -54,6 +56,31 @@ describe("board state", () => {
 
     expect(addCard(board, "todo", "  ", "details", "new-1")).toBe(board);
     expect(addCard(board, "unknown", "Task", "details", "new-1")).toBe(board);
+  });
+
+  it("matches cards by title or details regardless of active locale text", () => {
+    const board = freshBoard();
+    const card = board.cards.find((item) => item.id === "card-brief");
+    expect(card).toBeDefined();
+    if (!card) return;
+
+    expect(matchesCardSearch(card, "")).toBe(true);
+    expect(matchesCardSearch(card, "launch")).toBe(true);
+    expect(matchesCardSearch(card, "روایت")).toBe(true);
+    expect(matchesCardSearch(card, "missing")).toBe(false);
+  });
+
+  it("updates a card title and details while keeping the same id", () => {
+    const board = freshBoard();
+    const updated = updateCard(board, "card-brief", "  Refined story  ", "  Updated notes  ");
+
+    expect(updated.cards.find((card) => card.id === "card-brief")?.title).toEqual({
+      en: "Refined story",
+      fa: "Refined story",
+    });
+    expect(updated.cards.find((card) => card.id === "card-brief")?.details.en).toBe("Updated notes");
+    expect(updateCard(board, "card-brief", "  ", "notes")).toBe(board);
+    expect(updateCard(board, "missing", "Title", "details")).toBe(board);
   });
 
   it("deletes only the selected card", () => {

@@ -23,10 +23,10 @@ const text = (en: string, fa: string): LocalizedText => ({ en, fa });
 
 export const initialBoard: BoardState = {
   columns: [
-    { id: "backlog", name: text("Backlog", "در صف") },
-    { id: "todo", name: text("To Do", "برای انجام") },
+    { id: "backlog", name: text("New Requests", "درخواست‌های جدید") },
+    { id: "todo", name: text("Assigned", "واگذارشده") },
     { id: "in-progress", name: text("In Progress", "در حال انجام") },
-    { id: "review", name: text("Review", "بازبینی") },
+    { id: "review", name: text("Approved", "تأییدشده") },
     { id: "done", name: text("Done", "انجام‌شده") },
   ],
   cards: [
@@ -149,6 +149,33 @@ export function addCard(
   };
 }
 
+export function updateCard(
+  board: BoardState,
+  cardId: string,
+  title: string,
+  details: string,
+): BoardState {
+  const cleanTitle = title.trim();
+  const card = board.cards.find((item) => item.id === cardId);
+  if (!card || !cleanTitle) return board;
+
+  const cleanDetails = details.trim();
+  if (card.title.en === cleanTitle && card.details.en === cleanDetails) return board;
+
+  return {
+    ...board,
+    cards: board.cards.map((item) =>
+      item.id === cardId
+        ? {
+            ...item,
+            title: text(cleanTitle, cleanTitle),
+            details: text(cleanDetails, cleanDetails),
+          }
+        : item,
+    ),
+  };
+}
+
 export function deleteCard(board: BoardState, cardId: string): BoardState {
   const cards = board.cards.filter((card) => card.id !== cardId);
   return cards.length === board.cards.length ? board : { ...board, cards };
@@ -174,6 +201,14 @@ export function renameColumn(
         : item,
     ),
   };
+}
+
+export function matchesCardSearch(card: Card, query: string): boolean {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return true;
+
+  const haystack = [card.title.en, card.title.fa, card.details.en, card.details.fa].join(" ").toLowerCase();
+  return haystack.includes(needle);
 }
 
 export function moveCard(
