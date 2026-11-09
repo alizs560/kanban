@@ -145,6 +145,7 @@ const copy = {
 } as const;
 
 type Copy = (typeof copy)[Locale];
+type BoardView = "board" | "list";
 type Tone = "started" | "ongoing" | "idle" | "done";
 type Priority = "P1" | "P2" | "P3";
 type Accent = "green" | "orange" | "red";
@@ -439,6 +440,7 @@ function BoardColumn({
   onDelete,
   cardMeta,
   searchQuery,
+  view,
 }: {
   column: Column;
   cards: Card[];
@@ -452,6 +454,7 @@ function BoardColumn({
   onAdd: (columnId: string, title: string, details: string) => void;
   onDelete: (cardId: string) => void;
   searchQuery: string;
+  view: BoardView;
 }) {
   const isFiltering = searchQuery.trim().length > 0;
   const [isRenaming, setIsRenaming] = useState(false);
@@ -487,7 +490,7 @@ function BoardColumn({
   return (
     <section
       ref={dropRef}
-      className={`board-column${isDropTarget ? " is-drop-target" : ""}`}
+      className={`board-column${view === "list" ? " is-list" : ""}${isDropTarget ? " is-drop-target" : ""}`}
       aria-label={column.name[locale]}
       data-column-id={column.id}
     >
@@ -608,6 +611,7 @@ export default function BoardPage() {
   const [likedIds, setLikedIds] = useState<Record<string, boolean>>({});
   const [cardMeta, setCardMeta] = useState<Record<string, CardMeta>>(() => ({ ...initialCardMeta }));
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeView, setActiveView] = useState<BoardView>("board");
   const labels = copy[locale];
   const normalizedSearch = searchQuery.trim();
 
@@ -747,11 +751,21 @@ export default function BoardPage() {
 
           <div className="view-row">
             <div className="view-switch" role="group" aria-label={labels.views}>
-              <button type="button">
+              <button
+                type="button"
+                className={activeView === "list" ? "is-selected" : ""}
+                aria-pressed={activeView === "list"}
+                onClick={() => setActiveView("list")}
+              >
                 <List size={15} strokeWidth={2} aria-hidden="true" />
                 {labels.list}
               </button>
-              <button type="button" className="is-selected" aria-pressed="true">
+              <button
+                type="button"
+                className={activeView === "board" ? "is-selected" : ""}
+                aria-pressed={activeView === "board"}
+                onClick={() => setActiveView("board")}
+              >
                 <LayoutGrid size={15} strokeWidth={2} aria-hidden="true" />
                 {labels.boardView}
               </button>
@@ -777,14 +791,15 @@ export default function BoardPage() {
 
         <DragDropProvider onDragEnd={finishDrag}>
           <section
-            className={`board-scroll${normalizedSearch ? " is-filtering" : ""}`}
+            className={`board-scroll${normalizedSearch ? " is-filtering" : ""}${activeView === "list" ? " is-list-view" : ""}`}
             aria-label={labels.board}
           >
-            <div className="board-columns">
+            <div className={activeView === "board" ? "board-columns" : "board-list"}>
               {board.columns.map((column) => (
                 <BoardColumn
                   key={column.id}
                   column={column}
+                  view={activeView}
                   cards={board.cards.filter(
                     (card) =>
                       card.columnId === column.id && matchesCardSearch(card, normalizedSearch),

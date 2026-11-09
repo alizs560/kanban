@@ -400,11 +400,64 @@ textarea:focus-visible {
   padding: 14px 12px 12px;
   border-radius: 22px;
   background: var(--column);
+  box-shadow: inset 0 3px 0 var(--column-accent, #d5d9e4);
   isolation: isolate;
 }
 
+.board-column[data-column-id="backlog"] {
+  --column-accent: #a8b0bd;
+  background: #f6f7f9;
+}
+
+.board-column[data-column-id="todo"] {
+  --column-accent: #6b8cff;
+  background: #f2f5ff;
+}
+
+.board-column[data-column-id="in-progress"] {
+  --column-accent: #f5a524;
+  background: #fff9ef;
+}
+
+.board-column[data-column-id="review"] {
+  --column-accent: #9b7bff;
+  background: #f6f2ff;
+}
+
+.board-column[data-column-id="done"] {
+  --column-accent: #3dcb7a;
+  background: #f0faf4;
+}
+
 .board-column.is-drop-target {
-  box-shadow: inset 0 0 0 2px rgb(45 226 141 / 40%);
+  box-shadow:
+    inset 0 3px 0 var(--column-accent, #2de28d),
+    inset 0 0 0 2px rgb(45 226 141 / 40%);
+}
+
+.board-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  min-width: 0;
+}
+
+.board-list .board-column {
+  flex: none;
+  width: 100%;
+  max-width: 100%;
+  min-height: auto;
+}
+
+.board-list .board-column.is-list .card-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: 12px;
+}
+
+.board-scroll.is-list-view {
+  overflow-x: hidden;
 }
 
 .column-header {

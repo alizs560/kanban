@@ -57,6 +57,15 @@ test("moves a card by dragging it into another column", async ({ page }) => {
   await expect(page.locator('[data-column-id="backlog"] [data-card-id="card-brief"]')).toHaveCount(0);
 });
 
+test("shows cards in list view when the List tab is selected", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "List" }).click();
+
+  await expect(page.locator(".board-list")).toBeVisible();
+  await expect(page.getByText("Shape the launch story")).toBeVisible();
+  await expect(page.getByText("Build the core components")).toBeVisible();
+});
+
 test("filters visible cards by search query", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("searchbox", { name: "Search tasks..." }).fill("launch");
