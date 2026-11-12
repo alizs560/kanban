@@ -1,19 +1,22 @@
 @import "tailwindcss";
 
 :root {
-  --ink: #1d1b31;
-  --muted: #8d90a3;
+  --ink: #032147;
+  --muted: #888888;
   --line: #eceef3;
   --canvas: #f6f7fb;
   --column: #f2f3f8;
   --card: #ffffff;
-  --brand: #6d4aff;
-  --brand-deep: #5b3df0;
-  --brand-teal: #6d4aff;
-  --brand-surface: #ece9ff;
-  --brand-ink: #5b3df0;
+  --brand: #209dd7;
+  --brand-deep: #1680b2;
+  --brand-teal: #209dd7;
+  --brand-surface: #e9f5fb;
+  --brand-ink: #032147;
   --brand-night: #ffffff;
-  --shadow: 0 8px 24px rgb(28 27 49 / 6%);
+  --accent-yellow: #ecad0a;
+  --action-purple: #753991;
+  --action-purple-hover: #632e7c;
+  --shadow: 0 8px 24px rgb(3 33 71 / 6%);
 }
 
 @theme inline {
@@ -57,7 +60,7 @@ button {
 button:focus-visible,
 input:focus-visible,
 textarea:focus-visible {
-  outline: 2px solid rgb(109 74 255 / 45%);
+  outline: 2px solid rgb(32 157 215 / 45%);
   outline-offset: 2px;
 }
 
@@ -298,16 +301,16 @@ textarea:focus-visible {
   padding: 0 14px;
   border: 0;
   border-radius: 12px;
-  background: var(--brand);
+  background: var(--action-purple);
   color: #fff;
   cursor: pointer;
   font-size: 13px;
   font-weight: 650;
-  box-shadow: 0 8px 16px rgb(109 74 255 / 22%);
+  box-shadow: 0 8px 16px rgb(117 57 145 / 22%);
 }
 
 .share-button:hover {
-  background: var(--brand-deep);
+  background: var(--action-purple-hover);
 }
 
 .share-button.compact {
@@ -415,8 +418,8 @@ textarea:focus-visible {
 }
 
 .board-column[data-column-id="in-progress"] {
-  --column-accent: #f5a524;
-  background: #fff9ef;
+  --column-accent: var(--accent-yellow);
+  background: #fffdf5;
 }
 
 .board-column[data-column-id="review"] {

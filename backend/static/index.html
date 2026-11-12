@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مدیریت پروژه کانبان هوشمند</title>
+    <style>
+        :root {
+            --accent-yellow: #ecad0a;
+            --primary-blue: #209dd7;
+            --secondary-purple: #753991;
+            --deep-navy: #032147;
+            --text-gray: #888888;
+            --bg-light: #f8fafc;
+            --card-bg: #ffffff;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-light);
+            color: var(--deep-navy);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .container {
+            background: var(--card-bg);
+            border-top: 4px solid var(--accent-yellow);
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(3, 33, 71, 0.08);
+            max-width: 600px;
+            width: 100%;
+            padding: 36px;
+            text-align: center;
+        }
+
+        h1 {
+            color: var(--deep-navy);
+            font-size: 26px;
+            margin-bottom: 12px;
+        }
+
+        p {
+            color: var(--text-gray);
+            font-size: 15px;
+            line-height: 1.7;
+            margin-bottom: 24px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            background: rgba(32, 157, 215, 0.12);
+            color: var(--primary-blue);
+            padding: 8px 18px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 24px;
+        }
+
+        .links-group {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn-primary {
+            display: inline-block;
+            background: var(--secondary-purple);
+            color: #ffffff;
+            padding: 10px 22px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: opacity 0.2s;
+        }
+
+        .btn-primary:hover {
+            opacity: 0.9;
+        }
+
+        .btn-secondary {
+            display: inline-block;
+            background: transparent;
+            color: var(--primary-blue);
+            border: 1px solid var(--primary-blue);
+            padding: 10px 22px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(32, 157, 215, 0.08);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="status-badge">بک‌اند و سرو فایل‌های استاتیک فعال است</div>
+        <h1>سامانه مدیریت پروژه کانبان هوشمند</h1>
+        <p>
+            مرحله دوم اسکلت‌بندی و راه‌اندازی ساختار بک‌اند با موفقیت انجام شد. سرور FastAPI فایل‌های استاتیک را از ریشه سرو می‌کند و مسیر سلامت API در دسترس است.
+        </p>
+        <div class="links-group">
+            <a href="/api/health" class="btn-primary">بررسی وضعیت سلامت API</a>
+            <a href="/api/docs" class="btn-secondary">مستندات Swagger</a>
+        </div>
+    </div>
+</body>
+</html>

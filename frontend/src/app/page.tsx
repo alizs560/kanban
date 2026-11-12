@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useState, type FormEvent } from "react";
+import Link from "next/link";
 import {
   Bell,
   Calendar,
@@ -627,7 +628,7 @@ export default function BoardPage() {
   }
 
   function onSaveCard(cardId: string, title: string, details: string, meta: CardMeta) {
-    setBoard((current) => updateCard(current, cardId, title, details));
+    setBoard((current) => updateCard(current, cardId, title, details, locale));
     setCardMeta((current) => ({ ...current, [cardId]: meta }));
   }
 
@@ -660,9 +661,9 @@ export default function BoardPage() {
   return (
     <main className="app-shell" dir={locale === "fa" ? "rtl" : "ltr"} lang={locale}>
       <aside className="sidebar" aria-label={labels.nav}>
-        <a className="brand-lockup" href="/" aria-label={labels.product}>
+        <Link className="brand-lockup" href="/" aria-label={labels.product}>
           <img className="brand-mark" src="/brand/loom-icon.png" alt="" />
-        </a>
+        </Link>
         <nav className="side-nav">
           <button type="button" className="side-link is-active" aria-label={labels.home} aria-current="page">
             <HomeIcon size={18} strokeWidth={2} />

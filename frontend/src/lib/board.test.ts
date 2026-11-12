@@ -81,6 +81,11 @@ describe("board state", () => {
     expect(updated.cards.find((card) => card.id === "card-brief")?.details.en).toBe("Updated notes");
     expect(updateCard(board, "card-brief", "  ", "notes")).toBe(board);
     expect(updateCard(board, "missing", "Title", "details")).toBe(board);
+
+    const updatedFa = updateCard(board, "card-brief", "داستان بازنویسی شده", "توضیحات جدید", "fa");
+    const faCard = updatedFa.cards.find((card) => card.id === "card-brief");
+    expect(faCard?.title.fa).toBe("داستان بازنویسی شده");
+    expect(faCard?.title.en).toBe(board.cards.find((card) => card.id === "card-brief")?.title.en);
   });
 
   it("deletes only the selected card", () => {

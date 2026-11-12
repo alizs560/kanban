@@ -154,13 +154,37 @@ export function updateCard(
   cardId: string,
   title: string,
   details: string,
+  locale?: Locale,
 ): BoardState {
   const cleanTitle = title.trim();
   const card = board.cards.find((item) => item.id === cardId);
   if (!card || !cleanTitle) return board;
 
   const cleanDetails = details.trim();
-  if (card.title.en === cleanTitle && card.details.en === cleanDetails) return board;
+  if (locale) {
+    if (card.title[locale] === cleanTitle && card.details[locale] === cleanDetails) return board;
+    return {
+      ...board,
+      cards: board.cards.map((item) =>
+        item.id === cardId
+          ? {
+              ...item,
+              title: { ...item.title, [locale]: cleanTitle },
+              details: { ...item.details, [locale]: cleanDetails },
+            }
+          : item,
+      ),
+    };
+  }
+
+  if (
+    card.title.en === cleanTitle &&
+    card.details.en === cleanDetails &&
+    card.title.fa === cleanTitle &&
+    card.details.fa === cleanDetails
+  ) {
+    return board;
+  }
 
   return {
     ...board,

@@ -1,0 +1,11 @@
+.git
+.gitignore
+.next
+node_modules
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+test-results
+e2e
