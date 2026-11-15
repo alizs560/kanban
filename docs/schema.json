@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Kanban AI SQLite schema",
+  "description": "Relational schema for the multi-user Kanban MVP.",
+  "database": {
+    "engine": "sqlite",
+    "foreign_keys": true,
+    "journal_mode": "WAL",
+    "tables": {
+      "users": {
+        "columns": {
+          "id": { "type": "integer", "primary_key": true, "autoincrement": true },
+          "username": { "type": "text", "required": true, "unique": true },
+          "password_hash": { "type": "text", "required": true },
+          "created_at": { "type": "datetime", "required": true, "default": "CURRENT_TIMESTAMP" }
+        },
+        "indexes": ["ux_users_username"]
+      },
+      "boards": {
+        "columns": {
+          "id": { "type": "integer", "primary_key": true, "autoincrement": true },
+          "user_id": { "type": "integer", "required": true, "references": "users.id" },
+          "title": { "type": "text", "required": true },
+          "created_at": { "type": "datetime", "required": true, "default": "CURRENT_TIMESTAMP" },
+          "updated_at": { "type": "datetime", "required": true, "default": "CURRENT_TIMESTAMP" }
+        },
+        "constraints": ["uq_boards_user_id"],
+        "indexes": ["ix_boards_user_id"]
+      },
+      "phases": {
+        "columns": {
+          "id": { "type": "integer", "primary_key": true, "autoincrement": true },
+          "board_id": { "type": "integer", "required": true, "references": "boards.id" },
+          "key": { "type": "text", "required": true },
+          "label_en": { "type": "text", "required": true },
+          "label_fa": { "type": "text", "required": true },
+          "sort_order": { "type": "integer", "required": true },
+          "created_at": { "type": "datetime", "required": true, "default": "CURRENT_TIMESTAMP" }
+        },
+        "constraints": ["uq_phases_board_key", "uq_phases_board_sort_order"],
+        "indexes": ["ix_phases_board_id"]
+      },
+      "columns": {
+        "columns": {
+          "id": { "type": "integer", "primary_key": true, "autoincrement": true },
+          "board_id": { "type": "integer", "required": true, "references": "boards.id" },
+          "name_en": { "type": "text", "required": true },
+          "name_fa": { "type": "text", "required": true },
+          "sort_order": { "type": "integer", "required": true },
+          "created_at": { "type": "datetime", "required": true, "default": "CURRENT_TIMESTAMP" }
+        },
+        "constraints": ["uq_columns_board_sort_order"],
+        "indexes": ["ix_columns_board_id"]
+      },
+      "cards": {
+        "columns": {
+          "id": { "type": "integer", "primary_key": true, "autoincrement": true },
+          "column_id": { "type": "integer", "required": true, "references": "columns.id" },
+          "phase_id": { "type": "integer", "references": "phases.id" },
+          "title_en": { "type": "text", "required": true },
+          "title_fa": { "type": "text", "required": true },
+          "details_en": { "type": "text", "required": true, "default": "" },
+          "details_fa": { "type": "text", "required": true, "default": "" },
+          "priority": { "type": "text", "required": true, "default": "P3", "values": ["P1", "P2", "P3"] },
+          "sort_order": { "type": "integer", "required": true },
+          "start_date": { "type": "date" },
+          "due_date": { "type": "date" },
+          "cover_url": { "type": "text" },
+          "created_at": { "type": "datetime", "required": true, "default": "CURRENT_TIMESTAMP" },
+          "updated_at": { "type": "datetime", "required": true, "default": "CURRENT_TIMESTAMP" }
+        },
+        "constraints": ["ck_cards_priority", "uq_cards_column_sort_order"],
+        "indexes": ["ix_cards_column_id", "ix_cards_phase_id"]
+      },
+      "chat_messages": {
+        "columns": {
+          "id": { "type": "integer", "primary_key": true, "autoincrement": true },
+          "board_id": { "type": "integer", "required": true, "references": "boards.id" },
+          "user_id": { "type": "integer", "required": true, "references": "users.id" },
+          "role": { "type": "text", "required": true, "values": ["user", "assistant"] },
+          "content": { "type": "text", "required": true },
+          "board_snapshot": { "type": "text", "format": "json" },
+          "created_at": { "type": "datetime", "required": true, "default": "CURRENT_TIMESTAMP" }
+        },
+        "constraints": ["ck_chat_messages_role"],
+        "indexes": ["ix_chat_messages_board_created_at", "ix_chat_messages_user_id"]
+      }
+    }
+  }
+}

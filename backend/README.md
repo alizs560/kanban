@@ -12,9 +12,10 @@ The backend is built with Python 3.11+ and FastAPI, managed using `uv`. It serve
 - `GET /api/health`: Health check endpoint returning `{ "status": "ok" }`
 - `GET /api/docs`: Interactive OpenAPI documentation (Swagger UI)
 
-## Upcoming Milestones (Sections 5 & 6)
+## Database milestone
 
-- SQLite database modeling with multi-user schema support (`docs/schema.json` and `docs/DATABASE.md`)
+- SQLite database modeling with multi-user schema support is documented in `docs/schema.json` and `docs/DATABASE.md`.
+- The next implementation milestone is SQLite initialization and default user seeding.
 - Automatic database initialization and default user seeding (`user` / `password`)
 - Authentication endpoints (`/api/auth/login`)
 - Full Board CRUD endpoints (`/api/board`)
