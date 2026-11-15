@@ -2,7 +2,8 @@
 
 import { useState, type FormEvent } from "react";
 import { Lock, LogIn, User } from "lucide-react";
-import { authenticateUser, saveAuthSession, type AuthUser } from "@/lib/auth";
+import { saveAuthSession, type AuthUser } from "@/lib/auth";
+import { apiFetch, apiUrl } from "@/lib/api";
 import type { Locale } from "@/lib/board";
 
 interface LoginFormProps {
@@ -48,18 +49,30 @@ export function LoginForm({ locale, onLoginSuccess, onLocaleChange }: LoginFormP
 
   const t = copy[locale];
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setErrorMessage(null);
     setIsSubmitting(true);
 
-    const result = authenticateUser(username, password);
+    try {
+      const response = await apiFetch(apiUrl("/api/auth/login"), {
+        method: "POST",
+        body: JSON.stringify({ username, password }),
+      });
+      const result = (await response.json()) as {
+        token?: string;
+        user?: AuthUser;
+      };
+      if (!response.ok || !result.token || !result.user) {
+        throw new Error("invalid_credentials");
+      }
 
-    if (result.success && result.token && result.user) {
       saveAuthSession(result.token, result.user);
       onLoginSuccess(result.user);
-    } else {
+    } catch (error) {
+      console.error("Login request failed", error);
       setErrorMessage(t.errorInvalid);
+    } finally {
       setIsSubmitting(false);
     }
   }

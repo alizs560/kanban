@@ -17,8 +17,8 @@ The backend is built with Python 3.11+ and FastAPI, managed using `uv`. It serve
 - SQLite database modeling with multi-user schema support is documented in `docs/schema.json` and `docs/DATABASE.md`.
 - SQLite initialization and default user seeding (`user` / `password`) are implemented in `app/database.py`.
 - Authentication endpoints (`POST /api/auth/login` and `GET /api/auth/me`) with Bearer sessions
-- Full Board CRUD endpoints (`/api/board`)
-- OpenRouter integration with `openai/gpt-oss-120b` for the sidebar AI assistant
+- Board persistence endpoint (`GET/PUT /api/board`)
+- OpenRouter chat endpoint (`POST /api/chat`) using `OPENROUTER_API_KEY` and `OPENROUTER_MODEL`
 
 ## Requirements
 

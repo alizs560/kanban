@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import type { BoardState, Locale } from "@/lib/board";
 import { animateDrawerCascade, animateNewMessage } from "@/lib/animations";
+import { apiFetch, apiUrl } from "@/lib/api";
 
 export type SidebarTab =
   | "home"
@@ -47,7 +48,7 @@ interface AppSidebarProps {
   onToggleOpen: (open?: boolean) => void;
   onLogout: () => void;
   board: BoardState;
-  onAiAddCard?: (title: string, columnId: string) => void;
+  onBoardChange: (board: BoardState) => void;
 }
 
 function ChatBubble({ msg }: { msg: ChatMessage }) {
@@ -78,7 +79,7 @@ export function AppSidebar({
   onToggleOpen,
   onLogout,
   board,
-  onAiAddCard,
+  onBoardChange,
 }: AppSidebarProps) {
   const isRtl = locale === "fa";
   const drawerRef = useRef<HTMLDivElement>(null);
@@ -158,7 +159,7 @@ export function AppSidebar({
     setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
   }
 
-  function handleSendPrompt(e?: FormEvent) {
+  async function handleSendPrompt(e?: FormEvent) {
     if (e) e.preventDefault();
     const cleanPrompt = promptInput.trim();
     if (!cleanPrompt || isAiThinking) return;
@@ -174,45 +175,54 @@ export function AppSidebar({
     setPromptInput("");
     setIsAiThinking(true);
 
-    setTimeout(() => {
-      let aiReply =
-        locale === "fa"
-          ? "درخواست شما تحلیل شد و کارت مرتبط ایجاد گردید."
-          : "Your request was processed and the related task was updated.";
-      let actionLabel = locale === "fa" ? "اقدام انجام شد" : "Action executed";
-
-      if (cleanPrompt.includes("تسک") || cleanPrompt.includes("کارت") || cleanPrompt.toLowerCase().includes("add") || cleanPrompt.toLowerCase().includes("task")) {
-        const firstColId = board.columns[0]?.id || "todo";
-        const taskTitle = cleanPrompt.replace(/^(یک|لطفا|لطفاً|تسک|کارت|اضافه کن|بساز|add|create|task|card|\s)+/i, "").trim() || (locale === "fa" ? "تسک هوشمند جدید" : "New AI Task");
-        if (onAiAddCard) {
-          onAiAddCard(taskTitle, firstColId);
-        }
-        const firstColName = board.columns[0]?.name
-          ? locale === "fa"
-            ? board.columns[0].name.fa
-            : board.columns[0].name.en
-          : locale === "fa"
-            ? "لیست کارها"
-            : "To Do";
-        aiReply =
-          locale === "fa"
-            ? `کارت «${taskTitle}» با موفقیت به ستون «${firstColName}» اضافه شد.`
-            : `Card "${taskTitle}" was added to column "${firstColName}".`;
-        actionLabel = locale === "fa" ? "کارت جدید ایجاد شد" : "New card created";
+    try {
+      const response = await apiFetch(apiUrl("/api/chat"), {
+        method: "POST",
+        body: JSON.stringify({ message: cleanPrompt }),
+      });
+      const result = (await response.json()) as {
+        reply?: string;
+        board?: BoardState;
+        changed?: boolean;
+        detail?: string;
+      };
+      if (!response.ok || !result.reply || !result.board) {
+        throw new Error(result.detail || "chat_request_failed");
       }
 
+      const reply = result.reply;
+      onBoardChange(result.board);
       setMessages((prev) => [
         ...prev,
         {
           id: `ai-${Date.now()}`,
           sender: "ai",
-          text: aiReply,
+          text: reply,
           timestamp: locale === "fa" ? "لحظاتی پیش" : "Just now",
-          actionTaken: actionLabel,
+          actionTaken: result.changed
+            ? locale === "fa"
+              ? "تغییرات برد ذخیره شد"
+              : "Board changes saved"
+            : undefined,
         },
       ]);
+    } catch (error) {
+      console.error("AI chat request failed", error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `ai-error-${Date.now()}`,
+          sender: "ai",
+          text:
+            locale === "fa"
+              ? "ارتباط با دستیار برقرار نشد. کلید OpenRouter و اجرای بک‌اند را بررسی کنید."
+              : "The assistant could not be reached. Check the OpenRouter key and backend.",
+          timestamp: locale === "fa" ? "اکنون" : "Now",
+        },
+      ]);
+    } finally {
       setIsAiThinking(false);
-    }, 800);
+    }
   }
 
   function handleNavClick(tab: SidebarTab) {

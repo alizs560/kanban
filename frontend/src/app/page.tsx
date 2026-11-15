@@ -34,6 +34,8 @@ import { TimelineView } from "./TimelineView";
 import { CalendarView } from "./CalendarView";
 import { ProgressView } from "./ProgressView";
 import { AppSidebar, type SidebarTab } from "./AppSidebar";
+import { apiFetch, apiUrl } from "@/lib/api";
+import { getStoredToken } from "@/lib/auth";
 import { AppNavbar, type Theme } from "./AppNavbar";
 import {
   BOARD_STORAGE_KEY,
@@ -1253,15 +1255,11 @@ export default function BoardPage() {
     return "dark";
   });
   const [soloCards, setSoloCards] = useState<SoloCard[]>(getSavedSoloCards);
+  const [loadedBoardToken, setLoadedBoardToken] = useState<string | null>(null);
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("home");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const isInitialEntranceDone = useRef(false);
 
-  function handleAiAddCard(title: string, columnId: string) {
-    const id = `card-${Date.now()}`;
-    const cardPhase = selectedPhase === "all" ? "brand" : selectedPhase;
-    setBoard((current) => addCard(current, columnId, title, "", id, cardPhase));
-  }
   const [isCreatingColumn, setIsCreatingColumn] = useState(false);
   const [newColumnName, setNewColumnName] = useState("");
   const [isShareOpen, setIsShareOpen] = useState(false);
@@ -1273,13 +1271,41 @@ export default function BoardPage() {
   const labels = copy[locale];
   const shareUrl = typeof window !== "undefined" ? `${window.location.origin}/project/loom` : "/project/loom";
   const normalizedSearch = searchQuery.trim();
+  const authToken = getStoredToken();
   const filteredCards = board.cards.filter(
     (card) =>
       (selectedPhase === "all" || card.phase === selectedPhase) &&
       matchesCardSearch(card, normalizedSearch),
   );
 
-  // Save board changes to localStorage
+  useEffect(() => {
+    if (!isAuthenticated || !authToken) return;
+
+    let cancelled = false;
+    apiFetch(apiUrl("/api/board"))
+      .then(async (response) => {
+        if (!response.ok) {
+          if (response.status === 401) logout();
+          throw new Error(`board_load_failed_${response.status}`);
+        }
+        return response.json() as Promise<BoardState>;
+      })
+      .then((remoteBoard) => {
+        if (!cancelled) {
+          setBoard(remoteBoard);
+          setLoadedBoardToken(authToken);
+        }
+      })
+      .catch((error) => {
+        console.error("Board load failed", error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authToken, isAuthenticated, logout]);
+
+  // Keep the local cache for fast startup, but persist the authoritative board in SQLite.
   useEffect(() => {
     try {
       localStorage.setItem(BOARD_STORAGE_KEY, JSON.stringify(board));
@@ -1287,6 +1313,33 @@ export default function BoardPage() {
       // Ignore quota errors
     }
   }, [board]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !authToken || loadedBoardToken !== authToken) return;
+
+    const timer = window.setTimeout(() => {
+      apiFetch(apiUrl("/api/board"), {
+        method: "PUT",
+        body: JSON.stringify(board),
+      })
+        .then(async (response) => {
+          if (!response.ok) {
+            throw new Error(`board_save_failed_${response.status}`);
+          }
+          return response.json() as Promise<BoardState>;
+        })
+        .then((savedBoard) => {
+          setBoard((currentBoard) =>
+            JSON.stringify(currentBoard) === JSON.stringify(savedBoard)
+              ? currentBoard
+              : savedBoard,
+          );
+        })
+        .catch((error) => console.error("Board save failed", error));
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [authToken, board, isAuthenticated, loadedBoardToken]);
 
   // Save card metadata to localStorage
   useEffect(() => {
@@ -1425,7 +1478,7 @@ export default function BoardPage() {
         onToggleOpen={(open) => setIsSidebarOpen((prev) => (typeof open === "boolean" ? open : !prev))}
         onLogout={logout}
         board={board}
-        onAiAddCard={handleAiAddCard}
+        onBoardChange={setBoard}
       />
 
       <div className="workspace">
