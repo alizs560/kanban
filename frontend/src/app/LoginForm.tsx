@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { Lock, LogIn, User } from "lucide-react";
-import { saveAuthSession, type AuthUser } from "@/lib/auth";
+import { authenticateUser, saveAuthSession, type AuthUser } from "@/lib/auth";
 import { apiFetch, apiUrl } from "@/lib/api";
 import type { Locale } from "@/lib/board";
 
@@ -59,17 +59,33 @@ export function LoginForm({ locale, onLoginSuccess, onLocaleChange }: LoginFormP
         method: "POST",
         body: JSON.stringify({ username: username.trim(), password: password.trim() }),
       });
-      const result = (await response.json()) as {
-        token?: string;
-        user?: AuthUser;
-      };
-      if (!response.ok || !result.token || !result.user) {
-        throw new Error("invalid_credentials");
+      if (response.ok) {
+        const result = (await response.json()) as {
+          token?: string;
+          user?: AuthUser;
+        };
+        if (result.token && result.user) {
+          saveAuthSession(result.token, result.user);
+          onLoginSuccess(result.user);
+          return;
+        }
       }
 
-      saveAuthSession(result.token, result.user);
-      onLoginSuccess(result.user);
+      const localAuth = authenticateUser(username, password);
+      if (localAuth.success && localAuth.token && localAuth.user) {
+        saveAuthSession(localAuth.token, localAuth.user);
+        onLoginSuccess(localAuth.user);
+        return;
+      }
+
+      throw new Error("invalid_credentials");
     } catch (error) {
+      const localAuth = authenticateUser(username, password);
+      if (localAuth.success && localAuth.token && localAuth.user) {
+        saveAuthSession(localAuth.token, localAuth.user);
+        onLoginSuccess(localAuth.user);
+        return;
+      }
       console.error("Login request failed", error);
       setErrorMessage(t.errorInvalid);
     } finally {
