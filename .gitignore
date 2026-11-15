@@ -173,3 +173,8 @@ cython_debug/
 .pypirc
 
 .DS_Store
+
+# Local Kanban database
+backend/data/*.db
+backend/data/*.db-shm
+backend/data/*.db-wal
