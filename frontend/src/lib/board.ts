@@ -303,7 +303,7 @@ export function renameColumn(
 export function addColumn(
   board: BoardState,
   name: string,
-  _locale: Locale = "en",
+  locale: Locale = "en",
   id = `col-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
 ): BoardState {
   const cleanName = name.trim();
@@ -311,7 +311,10 @@ export function addColumn(
 
   const newColumn: Column = {
     id,
-    name: { en: cleanName, fa: cleanName },
+    name: {
+      en: locale === "en" ? cleanName : cleanName,
+      fa: locale === "fa" ? cleanName : cleanName,
+    },
   };
 
   return {
@@ -340,7 +343,7 @@ export function deleteColumn(board: BoardState, columnId: string): BoardState {
 export function addPhase(
   board: BoardState,
   name: string,
-  _locale: Locale = "en",
+  locale: Locale = "en",
   id = `phase-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
 ): BoardState {
   const cleanName = name.trim();
@@ -358,7 +361,10 @@ export function addPhase(
 
   const newPhase: Phase = {
     id,
-    label: { en: cleanName, fa: cleanName },
+    label: {
+      en: locale === "en" ? cleanName : cleanName,
+      fa: locale === "fa" ? cleanName : cleanName,
+    },
     badgeClass,
   };
 
@@ -461,4 +467,24 @@ export function moveCard(
   else remaining.push(nextCard);
 
   return { ...board, cards: remaining };
+}
+
+function toPersianDigits(n: number | string): string {
+  const farsiDigits = ["۰", "۱", "۲", "۳", "۴", "۵", "۶", "۷", "۸", "۹"];
+  return n.toString().replace(/\d/g, (x) => farsiDigits[parseInt(x, 10)]);
+}
+
+export function formatScheduleDate(
+  startDay = 1,
+  dueDay = 7,
+  locale: Locale = "en",
+): string {
+  const start = Math.max(1, Math.min(31, startDay || 1));
+  const due = Math.max(start, Math.min(31, dueDay || start));
+  if (locale === "fa") {
+    if (start === due) return `${toPersianDigits(start)} دسامبر`;
+    return `${toPersianDigits(start)} تا ${toPersianDigits(due)} دسامبر`;
+  }
+  if (start === due) return `Dec ${start}`;
+  return `Dec ${start} - ${due}`;
 }

@@ -7,6 +7,7 @@ import {
   deleteCard,
   deleteColumn,
   deletePhase,
+  formatScheduleDate,
   getBoardPhases,
   initialBoard,
   matchesCardSearch,
@@ -180,5 +181,12 @@ describe("board state", () => {
     );
     expect(moveCard(board, "missing-card", "todo")).toBe(board);
     expect(moveCard(board, "card-brand-concept", "missing-column")).toBe(board);
+  });
+
+  it("formats task schedule date ranges correctly in Persian and English", () => {
+    expect(formatScheduleDate(1, 5, "en")).toBe("Dec 1 - 5");
+    expect(formatScheduleDate(4, 4, "en")).toBe("Dec 4");
+    expect(formatScheduleDate(3, 8, "fa")).toBe("۳ تا ۸ دسامبر");
+    expect(formatScheduleDate(10, 10, "fa")).toBe("۱۰ دسامبر");
   });
 });

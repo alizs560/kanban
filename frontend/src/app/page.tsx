@@ -1,34 +1,34 @@
 "use client";
 
-import { useEffect, useId, useState, type FormEvent } from "react";
-import Link from "next/link";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import {
-  Bell,
   Calendar,
   Check,
-  ChevronDown,
-  GanttChart,
-  Home as HomeIcon,
-  LayoutGrid,
-  List,
+  Copy,
+  Globe2,
+  Link2,
+  LockKeyhole,
+  Mail,
   MessageCircle,
   Pencil,
   Plus,
-  Search,
-  Settings,
   Share2,
+  ShieldCheck,
   ThumbsUp,
   Trash2,
-  UserRound,
+  Upload,
   X,
-  Zap,
-  LogOut,
 } from "lucide-react";
 import { Feedback } from "@dnd-kit/dom";
 import { DragDropProvider, useDroppable, type DragEndEvent } from "@dnd-kit/react";
 import { useSortable } from "@dnd-kit/react/sortable";
 import { useAuthSession } from "@/lib/auth";
 import { LoginForm } from "./LoginForm";
+import { TimelineView } from "./TimelineView";
+import { CalendarView } from "./CalendarView";
+import { ProgressView } from "./ProgressView";
+import { AppSidebar, type SidebarTab } from "./AppSidebar";
+import { AppNavbar } from "./AppNavbar";
 import {
   BOARD_STORAGE_KEY,
   BOARD_VERSION_KEY,
@@ -40,6 +40,7 @@ import {
   deleteCard,
   deleteColumn,
   deletePhase,
+  formatScheduleDate,
   getBoardPhases,
   getLocalizedText,
   initialBoard,
@@ -87,6 +88,24 @@ const copy = {
     clearSearch: "Clear search",
     searchEmpty: "No matching cards.",
     share: "Share",
+    shareTitle: "Share this project",
+    shareDescription: "Invite teammates or copy a link to collaborate.",
+    inviteMembers: "Invite people",
+    invitePlaceholder: "name@company.com",
+    invite: "Invite",
+    invited: "Invited",
+    membersCount: "members",
+    copyLink: "Copy link",
+    copied: "Link copied",
+    permission: "Project access",
+    permissionPublic: "Anyone with the link",
+    permissionPublicHint: "Anyone with the link can view this project.",
+    permissionPrivate: "Only invited people",
+    permissionPrivateHint: "Only people you invite can open this project.",
+    linkLabel: "Project link",
+    close: "Close",
+    owner: "Owner",
+    member: "Member",
     like: "Like",
     visibility: "Public To All",
     views: "Board views",
@@ -115,6 +134,33 @@ const copy = {
     newPhasePlaceholder: "Phase name...",
     editPhase: "Edit phase",
     deletePhase: "Delete phase",
+    overallProgress: "Overall Progress",
+    tasksCompleted: "Tasks Completed",
+    tasksInProgress: "In Progress",
+    tasksRemaining: "To Do",
+    phaseProgress: "Progress by Phase",
+    priorityDistribution: "Priority Distribution",
+    monthName: "December 2026",
+    timelineStart: "Start",
+    timelineDue: "Due",
+    taskName: "Task",
+    columnHeader: "Column",
+    phaseHeader: "Phase",
+    statusHeader: "Status",
+    priorityHeader: "Priority",
+    noTasksInView: "No tasks to display in this view.",
+    prevMonth: "Previous",
+    nextMonth: "Next",
+    urgentPriority: "Urgent & High",
+    importantPriority: "Important",
+    normalPriority: "Normal",
+    scheduleRange: "Schedule (Date Range)",
+    startDate: "Start Date",
+    dueDate: "Due Date",
+    uploadImage: "Upload Image",
+    customCover: "Custom Image",
+    removeCover: "Remove Image",
+    previewImage: "Image Preview",
   },
   fa: {
     product: "LOOM",
@@ -146,6 +192,24 @@ const copy = {
     clearSearch: "پاک کردن جستجو",
     searchEmpty: "کارت مطابقتی نیست.",
     share: "اشتراک",
+    shareTitle: "اشتراک‌گذاری پروژه",
+    shareDescription: "هم‌تیمی‌ها را دعوت کنید یا لینک پروژه را کپی کنید.",
+    inviteMembers: "دعوت از افراد",
+    invitePlaceholder: "name@company.com",
+    invite: "دعوت",
+    invited: "دعوت شد",
+    membersCount: "عضو",
+    copyLink: "کپی لینک",
+    copied: "لینک کپی شد",
+    permission: "دسترسی به پروژه",
+    permissionPublic: "هرکس لینک را داشته باشد",
+    permissionPublicHint: "هرکس لینک را داشته باشد می‌تواند این پروژه را ببیند.",
+    permissionPrivate: "فقط افراد دعوت‌شده",
+    permissionPrivateHint: "فقط افرادی که دعوت می‌کنید می‌توانند پروژه را باز کنند.",
+    linkLabel: "لینک پروژه",
+    close: "بستن",
+    owner: "مالک",
+    member: "عضو",
     like: "پسند",
     visibility: "عمومی برای همه",
     views: "نمای تخته",
@@ -174,14 +238,41 @@ const copy = {
     newPhasePlaceholder: "نام بخش جدید...",
     editPhase: "ویرایش بخش",
     deletePhase: "حذف بخش",
+    overallProgress: "پیشرفت کل پروژه",
+    tasksCompleted: "کارهای تکمیل‌شده",
+    tasksInProgress: "در حال انجام",
+    tasksRemaining: "لیست کارها",
+    phaseProgress: "پیشرفت بر اساس بخش‌های کاری",
+    priorityDistribution: "توزیع بر اساس اولویت",
+    monthName: "دسامبر ۲۰۲۶ (آذر و دی)",
+    timelineStart: "شروع",
+    timelineDue: "سررسید",
+    taskName: "نام کار",
+    columnHeader: "ستون",
+    phaseHeader: "بخش کاری",
+    statusHeader: "وضعیت",
+    priorityHeader: "اولویت",
+    noTasksInView: "کاری برای نمایش در این نما وجود ندارد.",
+    prevMonth: "قبلی",
+    nextMonth: "بعدی",
+    urgentPriority: "فوری و مهم",
+    importantPriority: "مهم",
+    normalPriority: "عادی",
+    scheduleRange: "زمان‌بندی کار (بازه زمانی)",
+    startDate: "تاریخ شروع",
+    dueDate: "تاریخ سررسید / پایان",
+    uploadImage: "آپلود تصویر",
+    customCover: "تصویر آپلود شده",
+    removeCover: "حذف تصویر",
+    previewImage: "پیش‌نمایش تصویر",
   },
 } as const;
 
-type Copy = (typeof copy)[Locale];
-type BoardView = "board" | "list";
-type Tone = "started" | "ongoing" | "idle" | "done";
-type Priority = "P1" | "P2" | "P3";
-type Accent = "green" | "orange" | "red";
+export type Copy = (typeof copy)[Locale];
+export type BoardView = "board" | "list" | "timeline" | "calendar" | "progress";
+export type Tone = "started" | "ongoing" | "idle" | "done";
+export type Priority = "P1" | "P2" | "P3";
+export type Accent = "green" | "orange" | "red";
 
 const portraits = [
   "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=96&h=96&q=60",
@@ -198,7 +289,7 @@ const covers = {
 
 type CoverKey = keyof typeof covers;
 
-type CardMeta = {
+export type CardMeta = {
   tone: Tone;
   priority: Priority;
   accent?: Accent;
@@ -206,6 +297,8 @@ type CardMeta = {
   likes: number;
   avatar: string;
   image?: string;
+  startDay: number;
+  dueDay: number;
 };
 
 const defaultCardMeta = (): CardMeta => ({
@@ -214,25 +307,48 @@ const defaultCardMeta = (): CardMeta => ({
   comments: 0,
   likes: 0,
   avatar: portraits[0],
+  startDay: 1,
+  dueDay: 7,
 });
 
 const initialCardMeta: Record<string, CardMeta> = {
-  "card-brand-concept": { tone: "started", priority: "P1", accent: "orange", comments: 6, likes: 24, avatar: portraits[0], image: covers.room },
-  "card-typography-system": { tone: "started", priority: "P2", comments: 3, likes: 18, avatar: portraits[1] },
-  "card-user-flow": { tone: "ongoing", priority: "P1", accent: "green", comments: 8, likes: 35, avatar: portraits[2] },
-  "card-design-system": { tone: "idle", priority: "P2", comments: 4, likes: 29, avatar: portraits[3], image: covers.lens },
-  "card-components": { tone: "ongoing", priority: "P1", accent: "orange", comments: 14, likes: 78, avatar: portraits[0], image: covers.camera },
-  "card-motion-effects": { tone: "started", priority: "P2", accent: "green", comments: 9, likes: 42, avatar: portraits[1] },
-  "card-backend-api": { tone: "started", priority: "P1", accent: "red", comments: 11, likes: 38, avatar: portraits[2] },
-  "card-ai-copilot": { tone: "ongoing", priority: "P2", comments: 15, likes: 56, avatar: portraits[3] },
-  "card-docker-deploy": { tone: "done", priority: "P2", accent: "green", comments: 19, likes: 92, avatar: portraits[0], image: covers.room },
-  "card-performance-seo": { tone: "done", priority: "P1", accent: "red", comments: 27, likes: 145, avatar: portraits[1] },
+  "card-brand-concept": { tone: "done", priority: "P1", accent: "orange", comments: 6, likes: 24, avatar: portraits[0], image: covers.room, startDay: 1, dueDay: 4 },
+  "card-typography-system": { tone: "started", priority: "P2", comments: 3, likes: 18, avatar: portraits[1], startDay: 3, dueDay: 7 },
+  "card-user-flow": { tone: "started", priority: "P1", accent: "green", comments: 8, likes: 35, avatar: portraits[2], startDay: 6, dueDay: 11 },
+  "card-design-system": { tone: "idle", priority: "P2", comments: 4, likes: 29, avatar: portraits[3], image: covers.lens, startDay: 9, dueDay: 15 },
+  "card-components": { tone: "ongoing", priority: "P1", accent: "orange", comments: 14, likes: 78, avatar: portraits[0], image: covers.camera, startDay: 13, dueDay: 20 },
+  "card-motion-effects": { tone: "idle", priority: "P2", accent: "green", comments: 9, likes: 42, avatar: portraits[1], startDay: 16, dueDay: 22 },
+  "card-backend-api": { tone: "idle", priority: "P1", accent: "red", comments: 11, likes: 38, avatar: portraits[2], startDay: 18, dueDay: 25 },
+  "card-ai-copilot": { tone: "idle", priority: "P2", comments: 15, likes: 56, avatar: portraits[3], startDay: 21, dueDay: 27 },
+  "card-docker-deploy": { tone: "idle", priority: "P2", accent: "green", comments: 19, likes: 92, avatar: portraits[0], image: covers.room, startDay: 24, dueDay: 29 },
+  "card-performance-seo": { tone: "idle", priority: "P1", accent: "red", comments: 27, likes: 145, avatar: portraits[1], startDay: 26, dueDay: 31 },
 };
 
 const coverKeys: CoverKey[] = ["room", "lens", "camera"];
 const tones: Tone[] = ["idle", "started", "ongoing", "done"];
 const priorities: Priority[] = ["P1", "P2", "P3"];
 const accents: (Accent | "none")[] = ["none", "green", "orange", "red"];
+
+const priorityMetaConfig = {
+  P1: {
+    labelKey: "urgentPriority" as const,
+    colorClass: "priority-p1",
+    chipClass: "priority-chip-p1",
+    dotColor: "#d92d20",
+  },
+  P2: {
+    labelKey: "importantPriority" as const,
+    colorClass: "priority-p2",
+    chipClass: "priority-chip-p2",
+    dotColor: "#f79009",
+  },
+  P3: {
+    labelKey: "normalPriority" as const,
+    colorClass: "priority-p3",
+    chipClass: "priority-chip-p3",
+    dotColor: "#026aa2",
+  },
+} as const;
 
 function BoardCard({
   card,
@@ -281,21 +397,54 @@ function BoardCard({
   });
   const safeTone = safeMeta?.tone && labels[safeMeta.tone] ? safeMeta.tone : "idle";
   const toneLabel = labels[safeTone];
-  const coverKey =
-    safeMeta.image === covers.room
-      ? "room"
-      : safeMeta.image === covers.lens
-        ? "lens"
-        : safeMeta.image === covers.camera
-          ? "camera"
-          : "none";
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert(locale === "fa" ? "حجم تصویر نباید بیشتر از ۵ مگابایت باشد." : "Image size must be less than 5MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (uploadEvent) => {
+      const rawData = uploadEvent.target?.result as string;
+      if (!rawData) return;
+
+      const img = new Image();
+      img.onload = () => {
+        const maxWidth = 800;
+        let width = img.width;
+        let height = img.height;
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressed = canvas.toDataURL("image/jpeg", 0.78);
+          setDraft((prev) => ({ ...prev, image: compressed }));
+        } else {
+          setDraft((prev) => ({ ...prev, image: rawData }));
+        }
+      };
+      img.src = rawData;
+    };
+    reader.readAsDataURL(file);
+  }
 
   function openEdit() {
     const currentTitle = getLocalizedText(card.title, locale);
     const currentDetails = getLocalizedText(card.details, locale);
     setTitle(currentTitle);
     setDetails(currentDetails);
-    setDraft(safeMeta);
+    setDraft({ ...safeMeta });
     setDraftPhase(card.phase || "brand");
     setIsEditing(true);
   }
@@ -318,7 +467,7 @@ function BoardCard({
       role="listitem"
     >
       <article
-        className={`task-card${isDragging ? " is-dragging" : ""}${isEditing ? " is-editing" : ""}${safeMeta.image ? " has-cover" : ""}${safeMeta.accent ? ` accent-${safeMeta.accent}` : ""}`}
+        className={`task-card${isDragging ? " is-dragging" : ""}${isEditing ? " is-editing" : ""}${safeMeta.image && !isEditing ? " has-cover" : ""}${safeMeta.accent ? ` accent-${safeMeta.accent}` : ""}`}
         dir={locale === "fa" ? "rtl" : "ltr"}
         data-card-id={card.id}
         aria-label={`${labels.drag}: ${cardTitle}`}
@@ -355,17 +504,70 @@ function BoardCard({
             </select>
             <label>{labels.priority}</label>
             <div className="option-row" role="group" aria-label={labels.priority}>
-              {priorities.map((priority) => (
-                <button
-                  key={priority}
-                  type="button"
-                  className={`chip${draft.priority === priority ? " is-selected" : ""}`}
-                  aria-pressed={draft.priority === priority}
-                  onClick={() => setDraft({ ...draft, priority })}
+              {priorities.map((priority) => {
+                const pMeta = priorityMetaConfig[priority];
+                const isSelected = draft.priority === priority;
+                return (
+                  <button
+                    key={priority}
+                    type="button"
+                    className={`chip priority-chip ${pMeta.chipClass}${isSelected ? " is-selected" : ""}`}
+                    aria-pressed={isSelected}
+                    onClick={() => setDraft({ ...draft, priority })}
+                  >
+                    <span className="priority-dot" style={{ backgroundColor: pMeta.dotColor }} />
+                    {labels[pMeta.labelKey]}
+                  </button>
+                );
+              })}
+            </div>
+            <label>{labels.scheduleRange}</label>
+            <div className="schedule-picker-container">
+              <div className="schedule-field-col">
+                <span className="schedule-sublabel">{labels.startDate}</span>
+                <select
+                  id={`${editTitleId}-startDay`}
+                  value={draft.startDay || 1}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10) || 1;
+                    const curDue = draft.dueDay || 7;
+                    setDraft({
+                      ...draft,
+                      startDay: val,
+                      dueDay: Math.max(val, curDue),
+                    });
+                  }}
                 >
-                  {priority}
-                </button>
-              ))}
+                  {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                    <option key={d} value={d}>
+                      {locale === "fa" ? `${d} دسامبر` : `Dec ${d}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="schedule-field-col">
+                <span className="schedule-sublabel">{labels.dueDate}</span>
+                <select
+                  id={`${editTitleId}-dueDay`}
+                  value={draft.dueDay || Math.max(draft.startDay || 1, 7)}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10) || 1;
+                    setDraft({
+                      ...draft,
+                      dueDay: Math.max(draft.startDay || 1, val),
+                    });
+                  }}
+                >
+                  {Array.from({ length: 31 }, (_, i) => i + 1)
+                    .filter((d) => d >= (draft.startDay || 1))
+                    .map((d) => (
+                      <option key={d} value={d}>
+                        {locale === "fa" ? `${d} دسامبر` : `Dec ${d}`}
+                      </option>
+                    ))}
+                </select>
+              </div>
             </div>
             <label>{labels.accent}</label>
             <div className="option-row" role="group" aria-label={labels.accent}>
@@ -410,21 +612,78 @@ function BoardCard({
               ))}
             </select>
             <label htmlFor={`${editTitleId}-cover`}>{labels.cover}</label>
-            <select
-              id={`${editTitleId}-cover`}
-              value={coverKey}
-              onChange={(event) => {
-                const next = event.target.value as CoverKey | "none";
-                setDraft({ ...draft, image: next === "none" ? undefined : covers[next] });
-              }}
-            >
-              <option value="none">{labels.coverNone}</option>
-              {coverKeys.map((key) => (
-                <option key={key} value={key}>
-                  {key}
-                </option>
-              ))}
-            </select>
+            <div className="cover-picker-controls">
+              <select
+                id={`${editTitleId}-cover`}
+                value={
+                  draft.image === covers.room
+                    ? "room"
+                    : draft.image === covers.lens
+                      ? "lens"
+                      : draft.image === covers.camera
+                        ? "camera"
+                        : draft.image
+                          ? "custom"
+                          : "none"
+                }
+                onChange={(event) => {
+                  const next = event.target.value;
+                  if (next === "none") {
+                    setDraft({ ...draft, image: undefined });
+                  } else if (next === "room" || next === "lens" || next === "camera") {
+                    setDraft({ ...draft, image: covers[next as CoverKey] });
+                  }
+                }}
+              >
+                <option value="none">{labels.coverNone}</option>
+                {coverKeys.map((key) => (
+                  <option key={key} value={key}>
+                    {key}
+                  </option>
+                ))}
+                {draft.image &&
+                draft.image !== covers.room &&
+                draft.image !== covers.lens &&
+                draft.image !== covers.camera ? (
+                  <option value="custom">{labels.customCover}</option>
+                ) : null}
+              </select>
+
+              <button
+                type="button"
+                className="upload-image-btn"
+                onClick={() => fileInputRef.current?.click()}
+                title={labels.uploadImage}
+              >
+                <Upload size={14} aria-hidden="true" />
+                <span>{labels.uploadImage}</span>
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: "none" }}
+                onChange={handleImageUpload}
+              />
+            </div>
+
+            {draft.image ? (
+              <div className="cover-preview-wrapper">
+                <img src={draft.image} alt={labels.previewImage} className="cover-preview-thumbnail" />
+                <button
+                  type="button"
+                  className="remove-cover-btn"
+                  onClick={() => {
+                    setDraft({ ...draft, image: undefined });
+                    if (fileInputRef.current) fileInputRef.current.value = "";
+                  }}
+                  title={labels.removeCover}
+                >
+                  <Trash2 size={13} aria-hidden="true" />
+                  <span>{labels.removeCover}</span>
+                </button>
+              </div>
+            ) : null}
             <div className="form-actions">
               <button className="share-button compact" type="submit">
                 {labels.save}
@@ -447,13 +706,27 @@ function BoardCard({
                 </span>
               ) : null}
               <span className={`pill tone-${safeMeta.tone}`}>{toneLabel}</span>
-              <span className={`pill priority-${safeMeta.priority.toLowerCase()}`}>{safeMeta.priority}</span>
+              {(() => {
+                const pMeta = priorityMetaConfig[safeMeta.priority] || priorityMetaConfig.P2;
+                return (
+                  <span className={`pill ${pMeta.colorClass}`}>
+                    <span className="priority-dot" style={{ backgroundColor: pMeta.dotColor }} />
+                    {labels[pMeta.labelKey]}
+                  </span>
+                );
+              })()}
             </div>
             <div className="card-foot">
               <span className="avatar" aria-hidden="true">
                 <img src={safeMeta.avatar} alt="" />
               </span>
-              <span className="card-date">{labels.date}</span>
+              <span
+                className="card-date"
+                title={locale === "fa" ? "زمان‌بندی در دسامبر ۲۰۲۶" : "Scheduled in December 2026"}
+              >
+                <Calendar size={13} strokeWidth={2} aria-hidden="true" />
+                {formatScheduleDate(safeMeta.startDay, safeMeta.dueDay, locale)}
+              </span>
               <span className="card-stat">
                 <MessageCircle size={13} strokeWidth={2} aria-hidden="true" />
                 {safeMeta.comments}
@@ -473,7 +746,7 @@ function BoardCard({
               <button
                 className="icon-button edit-button"
                 type="button"
-                aria-label={`${labels.edit}: ${cardTitle}`}
+                aria-label={labels.edit}
                 onClick={openEdit}
               >
                 <Pencil size={14} strokeWidth={2.1} aria-hidden="true" />
@@ -481,7 +754,7 @@ function BoardCard({
               <button
                 className="icon-button delete-button"
                 type="button"
-                aria-label={`${labels.delete} ${cardTitle}`}
+                aria-label={labels.delete}
                 onClick={() => onDelete(card.id)}
               >
                 <X size={14} strokeWidth={2.2} aria-hidden="true" />
@@ -765,15 +1038,30 @@ export default function BoardPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPhase, setSelectedPhase] = useState<PhaseId | "all">("all");
   const [activeView, setActiveView] = useState<BoardView>("board");
+  const [sidebarTab, setSidebarTab] = useState<SidebarTab>("home");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  function handleAiAddCard(title: string, columnId: string) {
+    const id = `card-${Date.now()}`;
+    const cardPhase = selectedPhase === "all" ? "brand" : selectedPhase;
+    setBoard((current) => addCard(current, columnId, title, "", id, cardPhase));
+  }
   const [isCreatingColumn, setIsCreatingColumn] = useState(false);
   const [newColumnName, setNewColumnName] = useState("");
-  const [isCreatingPhase, setIsCreatingPhase] = useState(false);
-  const [newPhaseName, setNewPhaseName] = useState("");
-  const [editingPhaseId, setEditingPhaseId] = useState<string | null>(null);
-  const [editPhaseName, setEditPhaseName] = useState("");
+  const [isShareOpen, setIsShareOpen] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
+  const [sharePermission, setSharePermission] = useState<"public" | "private">("public");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [invitedEmails, setInvitedEmails] = useState<string[]>([]);
   const currentPhases = getBoardPhases(board);
   const labels = copy[locale];
+  const shareUrl = typeof window !== "undefined" ? `${window.location.origin}/project/loom` : "/project/loom";
   const normalizedSearch = searchQuery.trim();
+  const filteredCards = board.cards.filter(
+    (card) =>
+      (selectedPhase === "all" || card.phase === selectedPhase) &&
+      matchesCardSearch(card, normalizedSearch),
+  );
 
   // Save board changes to localStorage
   useEffect(() => {
@@ -805,6 +1093,34 @@ export default function BoardPage() {
       // Ignore storage errors
     }
   }, [locale]);
+
+  useEffect(() => {
+    if (!isShareOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsShareOpen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isShareOpen]);
+
+  async function copyShareLink() {
+    const link = window.location.href;
+    try {
+      await navigator.clipboard.writeText(link);
+      setShareCopied(true);
+      window.setTimeout(() => setShareCopied(false), 2200);
+    } catch {
+      setShareCopied(false);
+    }
+  }
+
+  function inviteMember(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const email = inviteEmail.trim();
+    if (!email || invitedEmails.includes(email)) return;
+    setInvitedEmails((current) => [...current, email]);
+    setInviteEmail("");
+  }
 
   function onLike(cardId: string) {
     setLikedIds((current) => ({ ...current, [cardId]: !current[cardId] }));
@@ -859,410 +1175,296 @@ export default function BoardPage() {
 
   return (
     <main className="app-shell" dir={locale === "fa" ? "rtl" : "ltr"} lang={locale}>
-      <aside className="sidebar" aria-label={labels.nav}>
-        <Link className="brand-lockup" href="/" aria-label={labels.product}>
-          <img className="brand-mark" src="/brand/loom-icon.png" alt="" />
-        </Link>
-        <nav className="side-nav">
-          <button type="button" className="side-link is-active" aria-label={labels.home} aria-current="page">
-            <HomeIcon size={18} strokeWidth={2} />
-          </button>
-          <button type="button" className="side-link" aria-label={labels.members}>
-            <UserRound size={18} strokeWidth={2} />
-          </button>
-          <button type="button" className="side-link" aria-label={labels.schedule}>
-            <Calendar size={18} strokeWidth={2} />
-          </button>
-          <button type="button" className="side-link" aria-label={labels.activity}>
-            <Zap size={18} strokeWidth={2} />
-          </button>
-          <button type="button" className="side-link" aria-label={labels.notifications}>
-            <Bell size={18} strokeWidth={2} />
-          </button>
-        </nav>
-        <div className="side-bottom">
-          <button
-            type="button"
-            className="side-link"
-            aria-label={labels.logout}
-            title={labels.logout}
-            onClick={logout}
-          >
-            <LogOut size={18} strokeWidth={2} />
-          </button>
-          <button type="button" className="side-link" aria-label={labels.settings}>
-            <Settings size={18} strokeWidth={2} />
-          </button>
-          <img className="sidebar-avatar" src={portraits[0]} alt="" />
-        </div>
-      </aside>
+      <AppSidebar
+        locale={locale}
+        activeTab={sidebarTab}
+        onTabChange={setSidebarTab}
+        isOpen={isSidebarOpen}
+        onToggleOpen={(open) => setIsSidebarOpen((prev) => (typeof open === "boolean" ? open : !prev))}
+        onLogout={logout}
+        board={board}
+        onAiAddCard={handleAiAddCard}
+      />
 
       <div className="workspace">
-        <header className="topbar">
-          <div className="title-row">
-            <h1 className="project-brand">
-              <img className="project-brand-logo" src="/brand/loom-icon.png" alt="" />
-              <span className="project-brand-name">{labels.board}</span>
-            </h1>
-            <div className="title-tools">
-              <label className="search-field">
-                <Search size={15} strokeWidth={2} aria-hidden="true" />
-                <input
-                  type="search"
-                  value={searchQuery}
-                  placeholder={labels.search}
-                  aria-label={labels.search}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                />
-                {normalizedSearch ? (
-                  <button
-                    type="button"
-                    className="search-clear"
-                    aria-label={labels.clearSearch}
-                    onClick={() => setSearchQuery("")}
-                  >
-                    <X size={14} strokeWidth={2.2} aria-hidden="true" />
-                  </button>
-                ) : null}
-              </label>
-              <div className="avatar-stack" aria-hidden="true">
-                {portraits.slice(0, 3).map((src) => (
-                  <img key={src} src={src} alt="" />
-                ))}
-                <b>+3</b>
-              </div>
-              <button className="share-button" type="button">
-                <Share2 size={14} strokeWidth={2.2} aria-hidden="true" />
-                {labels.share}
-              </button>
-              <div className="language-switch" role="group" aria-label={labels.switchLanguage}>
-                <button
-                  type="button"
-                  aria-label="EN"
-                  aria-pressed={locale === "en"}
-                  className={locale === "en" ? "selected" : ""}
-                  onClick={() => setLocale("en")}
-                >
-                  EN
-                </button>
-                <button
-                  type="button"
-                  aria-label="FA"
-                  aria-pressed={locale === "fa"}
-                  className={locale === "fa" ? "selected" : ""}
-                  onClick={() => setLocale("fa")}
-                >
-                  FA
-                </button>
-              </div>
-              <button
-                type="button"
-                className="logout-button"
-                onClick={logout}
-                aria-label={labels.logout}
-                title={labels.logout}
-              >
-                <LogOut size={14} aria-hidden="true" />
-                <span>{labels.logout}</span>
-              </button>
-            </div>
-          </div>
+        <AppNavbar
+          locale={locale}
+          labels={labels}
+          board={board}
+          activeView={activeView}
+          onViewChange={setActiveView}
+          selectedPhase={selectedPhase}
+          onPhaseSelect={setSelectedPhase}
+          phases={currentPhases}
+          onAddPhase={(name) => setBoard((current) => addPhase(current, name, locale))}
+          onRenamePhase={(phaseId, newName) => setBoard((current) => renamePhase(current, phaseId, newName, locale))}
+          onDeletePhase={(phaseId) => setBoard((current) => deletePhase(current, phaseId))}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          onLocaleChange={setLocale}
+          onOpenShare={() => setIsShareOpen(true)}
+          onLogout={logout}
+          isSidebarOpen={isSidebarOpen}
+          onToggleSidebar={(open) => setIsSidebarOpen((prev) => (typeof open === "boolean" ? open : !prev))}
+          onOpenAi={() => {
+            setSidebarTab("ai");
+            setIsSidebarOpen(true);
+          }}
+        />
 
-          <div className="view-row">
-            <div className="view-switch" role="group" aria-label={labels.views}>
-              <button
-                type="button"
-                className={activeView === "list" ? "is-selected" : ""}
-                aria-pressed={activeView === "list"}
-                onClick={() => setActiveView("list")}
-              >
-                <List size={15} strokeWidth={2} aria-hidden="true" />
-                {labels.list}
-              </button>
-              <button
-                type="button"
-                className={activeView === "board" ? "is-selected" : ""}
-                aria-pressed={activeView === "board"}
-                onClick={() => setActiveView("board")}
-              >
-                <LayoutGrid size={15} strokeWidth={2} aria-hidden="true" />
-                {labels.boardView}
-              </button>
-              <button type="button">
-                <GanttChart size={15} strokeWidth={2} aria-hidden="true" />
-                {labels.timeline}
-              </button>
-              <button type="button">
-                <Calendar size={15} strokeWidth={2} aria-hidden="true" />
-                {labels.calendar}
-              </button>
-              <button type="button">
-                <Check size={15} strokeWidth={2.2} aria-hidden="true" />
-                {labels.progress}
-              </button>
-            </div>
-            <button className="visibility" type="button">
-              {labels.visibility}
-              <ChevronDown size={14} strokeWidth={2.2} aria-hidden="true" />
-            </button>
-          </div>
-
-          <div
-            className="phase-tabs-row"
-            role="tablist"
-            aria-label={locale === "fa" ? "فازهای کاری" : "Workflow Phases"}
-          >
-            <button
-              type="button"
-              role="tab"
-              aria-selected={selectedPhase === "all"}
-              className={`phase-tab${selectedPhase === "all" ? " is-active" : ""}`}
-              onClick={() => setSelectedPhase("all")}
+        {isShareOpen ? (
+          <div className="share-modal-backdrop" role="presentation" onMouseDown={() => setIsShareOpen(false)}>
+            <section
+              className="share-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="share-modal-title"
+              onMouseDown={(event) => event.stopPropagation()}
             >
-              <span>{locale === "fa" ? "همه بخش‌ها" : "All Phases"}</span>
-              <span className="phase-tab-count">{board.cards.length}</span>
-            </button>
-            {currentPhases.map((phase) => {
-              const isEditingThisPhase = editingPhaseId === phase.id;
-              const count = board.cards.filter((c) => c.phase === phase.id).length;
-
-              if (isEditingThisPhase) {
-                return (
-                  <form
-                    key={phase.id}
-                    className="phase-tab-edit-form"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      if (editPhaseName.trim()) {
-                        setBoard((current) => renamePhase(current, phase.id, editPhaseName, locale));
-                      }
-                      setEditingPhaseId(null);
-                    }}
-                  >
-                    <input
-                      autoFocus
-                      maxLength={30}
-                      value={editPhaseName}
-                      onChange={(e) => setEditPhaseName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Escape") setEditingPhaseId(null);
-                      }}
-                    />
-                    <button type="submit" className="icon-button" aria-label={labels.save}>
-                      <Check size={14} aria-hidden="true" />
-                    </button>
-                    {currentPhases.length > 1 ? (
-                      <button
-                        type="button"
-                        className="icon-button delete-phase-icon"
-                        aria-label={labels.deletePhase}
-                        onClick={() => {
-                          setBoard((current) => deletePhase(current, phase.id));
-                          if (selectedPhase === phase.id) setSelectedPhase("all");
-                          setEditingPhaseId(null);
-                        }}
-                      >
-                        <Trash2 size={13} aria-hidden="true" />
-                      </button>
-                    ) : null}
-                    <button
-                      type="button"
-                      className="icon-button"
-                      aria-label={labels.cancel}
-                      onClick={() => setEditingPhaseId(null)}
-                    >
-                      <X size={14} aria-hidden="true" />
-                    </button>
-                  </form>
-                );
-              }
-
-              return (
-                <div key={phase.id} className="phase-tab-wrapper">
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={selectedPhase === phase.id}
-                    className={`phase-tab${selectedPhase === phase.id ? " is-active" : ""}`}
-                    onClick={() => setSelectedPhase(phase.id)}
-                  >
-                    <span>{getLocalizedText(phase.label, locale)}</span>
-                    <span className="phase-tab-count">{count}</span>
-                  </button>
-                  {selectedPhase === phase.id ? (
-                    <button
-                      type="button"
-                      className="phase-tab-edit-trigger"
-                      aria-label={`${labels.editPhase}: ${getLocalizedText(phase.label, locale)}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditPhaseName(getLocalizedText(phase.label, locale));
-                        setEditingPhaseId(phase.id);
-                      }}
-                    >
-                      <Pencil size={11} strokeWidth={2.2} aria-hidden="true" />
-                    </button>
-                  ) : null}
+              <div className="share-modal-header">
+                <div className="share-modal-heading">
+                  <div className="share-modal-icon" aria-hidden="true">
+                    <Share2 size={20} strokeWidth={2.2} />
+                  </div>
+                  <div>
+                    <h2 id="share-modal-title">{labels.shareTitle}</h2>
+                    <p>{labels.shareDescription}</p>
+                  </div>
                 </div>
-              );
-            })}
-
-            {isCreatingPhase ? (
-              <form
-                className="phase-tab-edit-form"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (newPhaseName.trim()) {
-                    setBoard((current) => addPhase(current, newPhaseName, locale));
-                    setNewPhaseName("");
-                    setIsCreatingPhase(false);
-                  }
-                }}
-              >
-                <input
-                  autoFocus
-                  maxLength={30}
-                  placeholder={labels.newPhasePlaceholder}
-                  value={newPhaseName}
-                  onChange={(e) => setNewPhaseName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Escape") {
-                      setIsCreatingPhase(false);
-                      setNewPhaseName("");
-                    }
-                  }}
-                />
-                <button type="submit" className="icon-button" aria-label={labels.save}>
-                  <Check size={14} aria-hidden="true" />
-                </button>
                 <button
                   type="button"
-                  className="icon-button"
-                  aria-label={labels.cancel}
-                  onClick={() => {
-                    setIsCreatingPhase(false);
-                    setNewPhaseName("");
-                  }}
+                  className="icon-button share-modal-close"
+                  aria-label={labels.close}
+                  onClick={() => setIsShareOpen(false)}
                 >
-                  <X size={14} aria-hidden="true" />
+                  <X size={18} aria-hidden="true" />
                 </button>
-              </form>
-            ) : (
-              <button
-                type="button"
-                className="phase-tab add-phase-tab"
-                onClick={() => setIsCreatingPhase(true)}
-                aria-label={labels.addPhase}
-              >
-                <Plus size={14} strokeWidth={2.2} aria-hidden="true" />
-                <span>{labels.addPhase}</span>
-              </button>
-            )}
-          </div>
-        </header>
+              </div>
 
-        <DragDropProvider onDragEnd={finishDrag}>
-          <section
-            className={`board-scroll${normalizedSearch ? " is-filtering" : ""}${activeView === "list" ? " is-list-view" : ""}`}
-            aria-label={labels.board}
-          >
-            <div className={activeView === "board" ? "board-columns" : "board-list"}>
-              {board.columns.map((column) => (
-                <BoardColumn
-                  key={column.id}
-                  column={column}
-                  view={activeView}
-                  phases={currentPhases}
-                  canDeleteColumn={board.columns.length > 1}
-                  onDeleteColumn={(columnId) => {
-                    setBoard((current) => deleteColumn(current, columnId));
-                  }}
-                  cards={board.cards.filter(
-                    (card) =>
-                      card.columnId === column.id &&
-                      (selectedPhase === "all" || card.phase === selectedPhase) &&
-                      matchesCardSearch(card, normalizedSearch),
-                  )}
-                  searchQuery={normalizedSearch}
-                  locale={locale}
-                  labels={labels}
-                  likedIds={likedIds}
-                  cardMeta={cardMeta}
-                  onLike={onLike}
-                  onSaveCard={onSaveCard}
-                  onRename={(columnId, name) =>
-                    setBoard((current) => renameColumn(current, columnId, name, locale))
-                  }
-                  onAdd={(columnId, title, details) => {
-                    const id = generateCardId();
-                    const cardPhase = selectedPhase !== "all" ? selectedPhase : "brand";
-                    setBoard((current) => addCard(current, columnId, title, details, id, cardPhase));
-                    setCardMeta((current) => ({ ...current, [id]: defaultCardMeta() }));
-                  }}
-                  onDelete={onDeleteCard}
-                />
-              ))}
-
-              {activeView === "board" ? (
-                isCreatingColumn ? (
-                  <form
-                    className="board-column add-column-card is-editing"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      if (newColumnName.trim()) {
-                        setBoard((current) => addColumn(current, newColumnName, locale));
-                        setNewColumnName("");
-                        setIsCreatingColumn(false);
-                      }
-                    }}
-                  >
-                    <div className="add-column-form">
-                      <input
-                        autoFocus
-                        required
-                        maxLength={40}
-                        value={newColumnName}
-                        placeholder={labels.newColumnPlaceholder}
-                        onChange={(e) => setNewColumnName(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Escape") {
-                            setIsCreatingColumn(false);
-                            setNewColumnName("");
-                          }
-                        }}
-                      />
-                      <div className="form-actions">
-                        <button className="share-button compact" type="submit">
-                          {labels.save}
-                        </button>
-                        <button
-                          className="icon-button"
-                          type="button"
-                          aria-label={labels.cancel}
-                          onClick={() => {
-                            setIsCreatingColumn(false);
-                            setNewColumnName("");
-                          }}
-                        >
-                          <X size={16} aria-hidden="true" />
-                        </button>
-                      </div>
-                    </div>
-                  </form>
-                ) : (
+              <div className="share-modal-section">
+                <div className="share-section-title">
+                  <span>{labels.permission}</span>
+                  <ShieldCheck size={16} aria-hidden="true" />
+                </div>
+                <div className="share-permission-list">
                   <button
                     type="button"
-                    className="add-column-button"
-                    onClick={() => setIsCreatingColumn(true)}
+                    className={`share-permission-option${sharePermission === "public" ? " is-selected" : ""}`}
+                    onClick={() => setSharePermission("public")}
+                    aria-pressed={sharePermission === "public"}
                   >
-                    <Plus size={18} strokeWidth={2.2} aria-hidden="true" />
-                    <span>{labels.addColumn}</span>
+                    <span className="share-option-icon"><Globe2 size={17} aria-hidden="true" /></span>
+                    <span className="share-option-copy">
+                      <strong>{labels.permissionPublic}</strong>
+                      <small>{labels.permissionPublicHint}</small>
+                    </span>
+                    <span className="share-radio" aria-hidden="true" />
                   </button>
-                )
-              ) : null}
-            </div>
+                  <button
+                    type="button"
+                    className={`share-permission-option${sharePermission === "private" ? " is-selected" : ""}`}
+                    onClick={() => setSharePermission("private")}
+                    aria-pressed={sharePermission === "private"}
+                  >
+                    <span className="share-option-icon"><LockKeyhole size={17} aria-hidden="true" /></span>
+                    <span className="share-option-copy">
+                      <strong>{labels.permissionPrivate}</strong>
+                      <small>{labels.permissionPrivateHint}</small>
+                    </span>
+                    <span className="share-radio" aria-hidden="true" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="share-modal-section">
+                <div className="share-section-title">
+                  <span>{labels.inviteMembers}</span>
+                  <span className="share-member-count">{invitedEmails.length + 3} {labels.membersCount}</span>
+                </div>
+                <form className="share-invite-form" onSubmit={inviteMember}>
+                  <Mail size={17} aria-hidden="true" />
+                  <label className="sr-only" htmlFor="share-invite-email">{labels.inviteMembers}</label>
+                  <input
+                    id="share-invite-email"
+                    type="email"
+                    value={inviteEmail}
+                    placeholder={labels.invitePlaceholder}
+                    onChange={(event) => setInviteEmail(event.target.value)}
+                  />
+                  <button type="submit" className="share-invite-button">{labels.invite}</button>
+                </form>
+                <div className="share-members-list">
+                  <div className="share-member">
+                    <img src={portraits[0]} alt="" />
+                    <span><strong>Alex Morgan</strong><small>alex@loom.team</small></span>
+                    <em>{labels.owner}</em>
+                  </div>
+                  <div className="share-member">
+                    <img src={portraits[1]} alt="" />
+                    <span><strong>Sam Chen</strong><small>sam@loom.team</small></span>
+                    <em>{labels.member}</em>
+                  </div>
+                  {invitedEmails.map((email) => (
+                    <div className="share-member" key={email}>
+                      <span className="share-member-fallback">{email.slice(0, 1).toUpperCase()}</span>
+                      <span><strong>{email}</strong><small>{labels.invited}</small></span>
+                      <em>{labels.member}</em>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="share-link-box">
+                <div className="share-link-copy">
+                  <Link2 size={17} aria-hidden="true" />
+                  <span><strong>{labels.linkLabel}</strong><small>{shareUrl}</small></span>
+                </div>
+                <button type="button" className={`share-copy-button${shareCopied ? " is-copied" : ""}`} onClick={copyShareLink}>
+                  {shareCopied ? <Check size={15} aria-hidden="true" /> : <Copy size={15} aria-hidden="true" />}
+                  {shareCopied ? labels.copied : labels.copyLink}
+                </button>
+              </div>
+            </section>
+          </div>
+        ) : null}
+
+        {activeView === "timeline" ? (
+          <section className="board-scroll" aria-label={labels.timeline}>
+            <TimelineView
+              cards={filteredCards}
+              columns={board.columns}
+              phases={currentPhases}
+              cardMeta={cardMeta}
+              locale={locale}
+              labels={labels}
+            />
           </section>
-        </DragDropProvider>
+        ) : activeView === "calendar" ? (
+          <section className="board-scroll" aria-label={labels.calendar}>
+            <CalendarView
+              cards={filteredCards}
+              columns={board.columns}
+              phases={currentPhases}
+              cardMeta={cardMeta}
+              locale={locale}
+              labels={labels}
+            />
+          </section>
+        ) : activeView === "progress" ? (
+          <section className="board-scroll" aria-label={labels.progress}>
+            <ProgressView
+              cards={filteredCards}
+              columns={board.columns}
+              phases={currentPhases}
+              cardMeta={cardMeta}
+              locale={locale}
+              labels={labels}
+            />
+          </section>
+        ) : (
+          <DragDropProvider onDragEnd={finishDrag}>
+            <section
+              className={`board-scroll${normalizedSearch ? " is-filtering" : ""}${activeView === "list" ? " is-list-view" : ""}`}
+              aria-label={labels.board}
+            >
+              <div className={activeView === "board" ? "board-columns" : "board-list"}>
+                {board.columns.map((column) => (
+                  <BoardColumn
+                    key={column.id}
+                    column={column}
+                    view={activeView}
+                    phases={currentPhases}
+                    canDeleteColumn={board.columns.length > 1}
+                    onDeleteColumn={(columnId) => {
+                      setBoard((current) => deleteColumn(current, columnId));
+                    }}
+                    cards={board.cards.filter(
+                      (card) =>
+                        card.columnId === column.id &&
+                        (selectedPhase === "all" || card.phase === selectedPhase) &&
+                        matchesCardSearch(card, normalizedSearch),
+                    )}
+                    searchQuery={normalizedSearch}
+                    locale={locale}
+                    labels={labels}
+                    likedIds={likedIds}
+                    cardMeta={cardMeta}
+                    onLike={onLike}
+                    onSaveCard={onSaveCard}
+                    onRename={(columnId, name) =>
+                      setBoard((current) => renameColumn(current, columnId, name, locale))
+                    }
+                    onAdd={(columnId, title, details) => {
+                      const id = generateCardId();
+                      const cardPhase = selectedPhase !== "all" ? selectedPhase : "brand";
+                      setBoard((current) => addCard(current, columnId, title, details, id, cardPhase));
+                      setCardMeta((current) => ({ ...current, [id]: defaultCardMeta() }));
+                    }}
+                    onDelete={onDeleteCard}
+                  />
+                ))}
+
+                {activeView === "board" ? (
+                  isCreatingColumn ? (
+                    <form
+                      className="board-column add-column-card is-editing"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (newColumnName.trim()) {
+                          setBoard((current) => addColumn(current, newColumnName, locale));
+                          setNewColumnName("");
+                          setIsCreatingColumn(false);
+                        }
+                      }}
+                    >
+                      <div className="add-column-form">
+                        <input
+                          autoFocus
+                          required
+                          maxLength={40}
+                          value={newColumnName}
+                          placeholder={labels.newColumnPlaceholder}
+                          onChange={(e) => setNewColumnName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Escape") {
+                              setIsCreatingColumn(false);
+                              setNewColumnName("");
+                            }
+                          }}
+                        />
+                        <div className="form-actions">
+                          <button className="share-button compact" type="submit">
+                            {labels.save}
+                          </button>
+                          <button
+                            className="icon-button"
+                            type="button"
+                            aria-label={labels.cancel}
+                            onClick={() => {
+                              setIsCreatingColumn(false);
+                              setNewColumnName("");
+                            }}
+                          >
+                            <X size={16} aria-hidden="true" />
+                          </button>
+                        </div>
+                      </div>
+                    </form>
+                  ) : (
+                    <button
+                      type="button"
+                      className="add-column-button"
+                      onClick={() => setIsCreatingColumn(true)}
+                    >
+                      <Plus size={18} strokeWidth={2.2} aria-hidden="true" />
+                      <span>{labels.addColumn}</span>
+                    </button>
+                  )
+                ) : null}
+              </div>
+            </section>
+          </DragDropProvider>
+        )}
       </div>
     </main>
   );
