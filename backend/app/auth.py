@@ -40,7 +40,8 @@ def _invalid_credentials() -> HTTPException:
 
 def authenticate_credentials(username: str, password: str) -> tuple[int, str] | None:
     clean_username = username.strip()
-    if not clean_username or not password:
+    clean_password = password.strip()
+    if not clean_username or not clean_password:
         return None
 
     connection = connect()
@@ -52,7 +53,7 @@ def authenticate_credentials(username: str, password: str) -> tuple[int, str] | 
     finally:
         connection.close()
 
-    if row is None or not verify_password(password, row["password_hash"]):
+    if row is None or not verify_password(clean_password, row["password_hash"]):
         return None
     return row["id"], clean_username
 
