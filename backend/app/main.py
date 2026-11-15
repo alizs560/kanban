@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from .database import initialize_database
+from .auth import router as auth_router
 
 
 @asynccontextmanager
@@ -19,6 +20,7 @@ app = FastAPI(
     openapi_url="/api/openapi.json",
     lifespan=lifespan,
 )
+app.include_router(auth_router)
 
 
 @app.get("/api/health")
