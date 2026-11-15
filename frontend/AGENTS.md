@@ -19,6 +19,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - کتابخانه هسته: React 19 با TypeScript
 - استایل‌دهی: Tailwind CSS v4، PostCSS با `@tailwindcss/postcss` و توکن‌های CSS در `src/app/globals.css`
 - سیستم کشیدن و رها کردن: `@dnd-kit/react` و `@dnd-kit/dom`
+- موتور انیمیشن: `gsap` و `@gsap/react` جهت چیدمان دانه‌دانه کارت‌ها، انیمیشن ورود اجزا، ۳D Tilt و ترنزیشن آبشاری پنل
 - آیکون‌ها: `lucide-react`
 - تست واحد: `vitest` با پوشش کامل توابع بورد و نشست احراز هویت (۱۹ تست پاس‌شده)
 
@@ -46,6 +47,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - `src/app/globals.css`: تعاریف پالت رنگ رسمی پروژه، توکن‌های سیستم طراحی، استایل‌های شیشه‌ای و قوانین جهت متن (RTL/LTR).
 - `src/lib/auth.ts`: مدیریت نشست احراز هویت در سمت کاربر با `useSyncExternalStore` و ذخیره‌سازی توکن در LocalStorage.
 - `src/lib/auth.test.ts`: آزمون‌های واحد نشست کاربر (ورود معتبر، ورود نامعتبر، خروج و بررسی اعتبار توکن).
+- `src/lib/animations.ts`: هوک‌ها و توابع ماژولار GSAP شامل تایم‌لاین ورود ترتیبی، چیدمان دانه‌دانه کارت‌ها، هوک `useCardTilt`، میکروبونس لایک و آبشار کشو.
 - `src/lib/api.ts`: کلاینت فراخوانی سرویس‌های بک‌اند با الصاق خودکار هدر Bearer توکن.
 - `src/lib/board.ts`: مدل داده خالص تخته کانبان، توابع پویا برای افزودن ستون (`addColumn`)، حذف ستون (`deleteColumn`)، تغییر نام (`renameColumn`)، افزودن فاز (`addPhase`)، ویرایش فاز (`renamePhase`)، حذف فاز (`deletePhase`) و فرمت‌بندی دو زبانه بازه زمان‌بندی (`formatScheduleDate`).
 - `src/lib/board.test.ts`: آزمون‌های واحد Vitest برای اعتبارسنجی کلیه توابع وضعیت تخته، فازها و زمان‌بندی (۱۹ تست پاس‌شده).

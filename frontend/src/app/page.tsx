@@ -23,7 +23,12 @@ import { Feedback } from "@dnd-kit/dom";
 import { DragDropProvider, useDroppable, type DragEndEvent } from "@dnd-kit/react";
 import { useSortable } from "@dnd-kit/react/sortable";
 import { useAuthSession } from "@/lib/auth";
-import { useCardTilt, animateLikeButton, animateCardsEntrance } from "@/lib/animations";
+import {
+  useCardTilt,
+  animateLikeButton,
+  animatePageAndCardsSequence,
+  animateCardsDealSequence,
+} from "@/lib/animations";
 import { LoginForm } from "./LoginForm";
 import { TimelineView } from "./TimelineView";
 import { CalendarView } from "./CalendarView";
@@ -1250,6 +1255,7 @@ export default function BoardPage() {
   const [soloCards, setSoloCards] = useState<SoloCard[]>(getSavedSoloCards);
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("home");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const isInitialEntranceDone = useRef(false);
 
   function handleAiAddCard(title: string, columnId: string) {
     const id = `card-${Date.now()}`;
@@ -1331,8 +1337,11 @@ export default function BoardPage() {
   }, [isShareOpen]);
 
   useEffect(() => {
-    if (activeView === "board") {
-      animateCardsEntrance(".task-card");
+    if (!isInitialEntranceDone.current) {
+      isInitialEntranceDone.current = true;
+      animatePageAndCardsSequence();
+    } else if (activeView === "board") {
+      animateCardsDealSequence(".task-card");
     }
   }, [selectedPhase, activeView]);
 
