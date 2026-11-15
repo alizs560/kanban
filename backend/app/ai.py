@@ -31,6 +31,29 @@ class ChatResponse(BaseModel):
     changed: bool
 
 
+class ChatHistoryItem(BaseModel):
+    id: int
+    role: str
+    content: str
+    has_snapshot: bool = Field(default=False, alias="hasSnapshot")
+    created_at: str = Field(default="", alias="createdAt")
+
+    model_config = {"populate_by_name": True}
+
+
+class ChatHistoryResponse(BaseModel):
+    messages: list[ChatHistoryItem]
+    can_undo: bool = Field(default=False, alias="canUndo")
+
+    model_config = {"populate_by_name": True}
+
+
+class UndoResponse(BaseModel):
+    reply: str
+    board: BoardState
+    restored: bool
+
+
 def _board_id(user_id: int) -> int:
     connection = connect()
     try:
@@ -157,6 +180,104 @@ def _store_message(user_id: int, board_id: int, role: str, content: str, snapsho
         )
 
 
+@router.get("/history", response_model=ChatHistoryResponse)
+async def chat_history(
+    user_id: int = Depends(get_current_user_id),
+) -> ChatHistoryResponse:
+    board_id = _board_id(user_id)
+    connection = connect()
+    try:
+        rows = connection.execute(
+            """
+            SELECT id, role, content, (board_snapshot IS NOT NULL) AS has_snapshot, created_at
+            FROM chat_messages
+            WHERE user_id = ? AND board_id = ?
+            ORDER BY id ASC
+            LIMIT 50
+            """,
+            (user_id, board_id),
+        ).fetchall()
+        has_undo_row = connection.execute(
+            """
+            SELECT 1 FROM chat_messages
+            WHERE user_id = ? AND board_id = ? AND board_snapshot IS NOT NULL
+            LIMIT 1
+            """,
+            (user_id, board_id),
+        ).fetchone()
+    finally:
+        connection.close()
+
+    items = [
+        ChatHistoryItem(
+            id=row["id"],
+            role=row["role"],
+            content=row["content"],
+            hasSnapshot=bool(row["has_snapshot"]),
+            createdAt=str(row["created_at"]),
+        )
+        for row in rows
+    ]
+    return ChatHistoryResponse(
+        messages=items,
+        canUndo=has_undo_row is not None,
+    )
+
+
+@router.post("/undo", response_model=UndoResponse)
+async def chat_undo(
+    user_id: int = Depends(get_current_user_id),
+) -> UndoResponse:
+    board_id = _board_id(user_id)
+    connection = connect()
+    try:
+        row = connection.execute(
+            """
+            SELECT id, board_snapshot
+            FROM chat_messages
+            WHERE user_id = ? AND board_id = ? AND board_snapshot IS NOT NULL
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (user_id, board_id),
+        ).fetchone()
+    finally:
+        connection.close()
+
+    if row is None or not row["board_snapshot"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="no_undo_available",
+        )
+
+    try:
+        snapshot_data = json.loads(row["board_snapshot"])
+        restored_state = BoardState.model_validate(snapshot_data)
+    except Exception as error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="corrupt_board_snapshot",
+        ) from error
+
+    restored_board = save_board(user_id, restored_state)
+
+    # Clear snapshot on this row to avoid double undo
+    with transaction() as tx_conn:
+        tx_conn.execute(
+            "UPDATE chat_messages SET board_snapshot = NULL WHERE id = ?",
+            (row["id"],),
+        )
+
+    reply_msg = "تغییرات هوش مصنوعی بازگردانده شد و وضعیت تخته به حالت قبل برگشت."
+    _store_message(user_id, board_id, "assistant", reply_msg)
+
+    return UndoResponse(
+        reply=reply_msg,
+        board=restored_board,
+        restored=True,
+    )
+
+
 @router.post("", response_model=ChatResponse)
 async def chat(
     payload: ChatRequest,
@@ -176,7 +297,13 @@ async def chat(
     result_board = current_board
     if updated_board is not None:
         result_board = save_board(user_id, updated_board)
-    _store_message(user_id, board_id, "user", payload.message.strip(), snapshot)
+    _store_message(
+        user_id,
+        board_id,
+        "user",
+        payload.message.strip(),
+        snapshot if updated_board is not None else None,
+    )
     _store_message(user_id, board_id, "assistant", reply)
     return ChatResponse(
         reply=reply,

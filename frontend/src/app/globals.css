@@ -3583,6 +3583,37 @@ main[dir="rtl"] .card-actions .icon-button[aria-label]::before {
   background: #10b981;
 }
 
+.ai-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ai-undo-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #c2410c;
+  background: rgba(234, 88, 12, 0.1);
+  border: 1px solid rgba(234, 88, 12, 0.3);
+  padding: 3px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ai-undo-btn:hover:not(:disabled) {
+  background: rgba(234, 88, 12, 0.2);
+  color: #9a3412;
+}
+
+.ai-undo-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .ai-model-tag {
   font-size: 10px;
   font-weight: 600;

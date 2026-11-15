@@ -68,3 +68,138 @@ class ChatApiTests(unittest.TestCase):
         finally:
             connection.close()
 
+    def test_chat_creates_multiple_cards(self):
+        board_res = self.client.get("/api/board", headers=self.headers)
+        current_board = board_res.json()
+        target_col = current_board["columns"][0]["id"]
+
+        import copy, json
+        new_board = copy.deepcopy(current_board)
+        new_board["cards"].append({
+            "id": "card-ai-1",
+            "columnId": target_col,
+            "title": {"en": "AI Test Card 1", "fa": "کارت تستی هوش مصنوعی ۱"},
+            "details": {"en": "Created via AI", "fa": "ایجاد شده توسط هوش مصنوعی"},
+            "phase": None,
+        })
+        new_board["cards"].append({
+            "id": "card-ai-2",
+            "columnId": target_col,
+            "title": {"en": "AI Test Card 2", "fa": "کارت تستی هوش مصنوعی ۲"},
+            "details": {"en": "Created via AI 2", "fa": "ایجاد شده توسط هوش مصنوعی ۲"},
+            "phase": None,
+        })
+
+        ai_payload = {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps({
+                            "reply": "دو کارت جدید به ستون اول افزوده شد.",
+                            "updated_board": new_board,
+                        })
+                    }
+                }
+            ]
+        }
+
+        with patch("app.ai._call_openrouter", return_value=ai_payload):
+            response = self.client.post(
+                "/api/chat",
+                headers=self.headers,
+                json={"message": "دو تا تسک تستی اضافه کن"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["changed"])
+        self.assertEqual(len(response.json()["board"]["cards"]), 12)
+
+    def test_chat_moves_card_between_columns(self):
+        board_res = self.client.get("/api/board", headers=self.headers)
+        current_board = board_res.json()
+        first_card = current_board["cards"][0]
+        done_col = current_board["columns"][-1]["id"]
+
+        import copy, json
+        new_board = copy.deepcopy(current_board)
+        new_board["cards"][0]["columnId"] = done_col
+
+        ai_payload = {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps({
+                            "reply": "کارت به ستون تکمیل شده منتقل گردید.",
+                            "updated_board": new_board,
+                        })
+                    }
+                }
+            ]
+        }
+
+        with patch("app.ai._call_openrouter", return_value=ai_payload):
+            response = self.client.post(
+                "/api/chat",
+                headers=self.headers,
+                json={"message": "کارت اول را به ستون تکمیل شده ببر"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["changed"])
+        card_in_res = next(c for c in response.json()["board"]["cards"] if c["title"]["en"] == first_card["title"]["en"])
+        self.assertEqual(card_in_res["columnId"], done_col)
+
+    def test_chat_history_and_undo(self):
+        # 1. Ask a question that changes the board
+        board_res = self.client.get("/api/board", headers=self.headers)
+        initial_board = board_res.json()
+        initial_count = len(initial_board["cards"])
+
+        import copy, json
+        new_board = copy.deepcopy(initial_board)
+        new_board["cards"].append({
+            "id": "card-undo-test",
+            "columnId": initial_board["columns"][0]["id"],
+            "title": {"en": "Temporary Card", "fa": "کارت موقت"},
+            "details": {"en": "Details", "fa": "توضیحات"},
+            "phase": None,
+        })
+
+        ai_payload = {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps({
+                            "reply": "یک کارت جدید اضافه شد.",
+                            "updated_board": new_board,
+                        })
+                    }
+                }
+            ]
+        }
+
+        with patch("app.ai._call_openrouter", return_value=ai_payload):
+            self.client.post(
+                "/api/chat",
+                headers=self.headers,
+                json={"message": "کارت موقت بساز"},
+            )
+
+        # Check history
+        history_res = self.client.get("/api/chat/history", headers=self.headers)
+        self.assertEqual(history_res.status_code, 200)
+        history_data = history_res.json()
+        self.assertTrue(history_data["canUndo"])
+        self.assertGreaterEqual(len(history_data["messages"]), 2)
+
+        # 2. Call Undo
+        undo_res = self.client.post("/api/chat/undo", headers=self.headers)
+        self.assertEqual(undo_res.status_code, 200)
+        undo_data = undo_res.json()
+        self.assertTrue(undo_data["restored"])
+        self.assertEqual(len(undo_data["board"]["cards"]), initial_count)
+
+        # Verify board reloaded from DB
+        reloaded = self.client.get("/api/board", headers=self.headers).json()
+        self.assertEqual(len(reloaded["cards"]), initial_count)
+

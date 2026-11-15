@@ -12,6 +12,7 @@ import {
   Home as HomeIcon,
   LogOut,
   Plus,
+  RotateCcw,
   Send,
   Settings,
   Sparkles,
@@ -104,6 +105,79 @@ export function AppSidebar({
   ]);
   const [promptInput, setPromptInput] = useState("");
   const [isAiThinking, setIsAiThinking] = useState(false);
+  const [canUndo, setCanUndo] = useState(false);
+  const [isUndoing, setIsUndoing] = useState(false);
+
+  useEffect(() => {
+    async function loadChatHistory() {
+      try {
+        const response = await apiFetch(apiUrl("/api/chat/history"));
+        if (!response.ok) return;
+        const data = (await response.json()) as {
+          messages?: Array<{ id: number; role: string; content: string; createdAt: string }>;
+          canUndo?: boolean;
+        };
+        if (Array.isArray(data.messages) && data.messages.length > 0) {
+          setMessages(
+            data.messages.map((m) => ({
+              id: `msg-${m.id}`,
+              sender: m.role === "user" ? "user" : "ai",
+              text: m.content,
+              timestamp: m.createdAt && m.createdAt.length >= 16 ? m.createdAt.slice(11, 16) : (locale === "fa" ? "لحظاتی پیش" : "Just now"),
+            }))
+          );
+        }
+        if (typeof data.canUndo === "boolean") {
+          setCanUndo(data.canUndo);
+        }
+      } catch {
+        // Backend history endpoint might be offline in pure client preview
+      }
+    }
+
+    if (isOpen && activeTab === "ai") {
+      loadChatHistory();
+    }
+  }, [isOpen, activeTab, locale]);
+
+  async function handleUndo() {
+    if (isUndoing || !canUndo) return;
+    setIsUndoing(true);
+    try {
+      const response = await apiFetch(apiUrl("/api/chat/undo"), {
+        method: "POST",
+      });
+      const data = (await response.json()) as {
+        reply?: string;
+        board?: BoardState;
+        restored?: boolean;
+        detail?: string;
+      };
+      if (!response.ok || !data.restored || !data.board) {
+        throw new Error(data.detail || "undo_failed");
+      }
+      onBoardChange(data.board);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `undo-${Date.now()}`,
+          sender: "ai",
+          text:
+            data.reply ||
+            (locale === "fa"
+              ? "تغییرات هوش مصنوعی بازگردانده شد و تخته به وضعیت پیشین برگشت."
+              : "AI changes were undone and board restored to previous state."),
+          timestamp: locale === "fa" ? "لحظاتی پیش" : "Just now",
+          actionTaken: locale === "fa" ? "تغییرات بازگردانده شد" : "Undo completed",
+        },
+      ]);
+      setCanUndo(false);
+    } catch (err) {
+      console.error("Undo request failed", err);
+    } finally {
+      setIsUndoing(false);
+    }
+  }
 
   // Quick suggestions for AI
   const quickPrompts =
@@ -192,6 +266,9 @@ export function AppSidebar({
 
       const reply = result.reply;
       onBoardChange(result.board);
+      if (result.changed) {
+        setCanUndo(true);
+      }
       setMessages((prev) => [
         ...prev,
         {
@@ -475,7 +552,21 @@ export function AppSidebar({
                   <span className="ai-indicator-dot" />
                   <span>{locale === "fa" ? "مدل آماده دریافت دستور" : "Model ready"}</span>
                 </div>
-                <span className="ai-model-tag">gpt-oss-120b</span>
+                <div className="ai-header-actions">
+                  {canUndo && (
+                    <button
+                      type="button"
+                      className="ai-undo-btn"
+                      onClick={handleUndo}
+                      disabled={isUndoing}
+                      title={locale === "fa" ? "بازگردانی آخرین تغییرات هوش مصنوعی" : "Undo last AI changes"}
+                    >
+                      <RotateCcw size={12} className={isUndoing ? "animate-spin" : ""} />
+                      <span>{locale === "fa" ? "بازگردانی (Undo)" : "Undo"}</span>
+                    </button>
+                  )}
+                  <span className="ai-model-tag">gpt-oss-120b</span>
+                </div>
               </div>
 
               {/* Chat message history */}
