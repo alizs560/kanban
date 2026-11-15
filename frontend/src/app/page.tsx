@@ -12,32 +12,48 @@ import {
   LayoutGrid,
   List,
   MessageCircle,
-  MoreHorizontal,
   Pencil,
   Plus,
   Search,
   Settings,
   Share2,
   ThumbsUp,
+  Trash2,
   UserRound,
   X,
   Zap,
+  LogOut,
 } from "lucide-react";
 import { Feedback } from "@dnd-kit/dom";
 import { DragDropProvider, useDroppable, type DragEndEvent } from "@dnd-kit/react";
 import { useSortable } from "@dnd-kit/react/sortable";
+import { useAuthSession } from "@/lib/auth";
+import { LoginForm } from "./LoginForm";
 import {
+  BOARD_STORAGE_KEY,
+  BOARD_VERSION_KEY,
+  CARD_META_STORAGE_KEY,
+  CURRENT_BOARD_VERSION,
   addCard,
+  addColumn,
+  addPhase,
   deleteCard,
+  deleteColumn,
+  deletePhase,
+  getBoardPhases,
+  getLocalizedText,
   initialBoard,
   matchesCardSearch,
   moveCard,
   renameColumn,
+  renamePhase,
   updateCard,
   type BoardState,
   type Card,
   type Column,
   type Locale,
+  type Phase,
+  type PhaseId,
 } from "@/lib/board";
 
 const copy = {
@@ -91,6 +107,14 @@ const copy = {
     idle: "Not Started",
     done: "Completed",
     date: "Dec 2 - 8",
+    logout: "Sign Out",
+    addColumn: "Add column",
+    newColumnPlaceholder: "Column name...",
+    deleteColumn: "Delete column",
+    addPhase: "Add phase",
+    newPhasePlaceholder: "Phase name...",
+    editPhase: "Edit phase",
+    deletePhase: "Delete phase",
   },
   fa: {
     product: "LOOM",
@@ -142,6 +166,14 @@ const copy = {
     idle: "شروع‌نشده",
     done: "تکمیل‌شده",
     date: "۲ تا ۸ دسامبر",
+    logout: "خروج از حساب",
+    addColumn: "افزودن ستون",
+    newColumnPlaceholder: "نام ستون جدید...",
+    deleteColumn: "حذف ستون",
+    addPhase: "افزودن بخش",
+    newPhasePlaceholder: "نام بخش جدید...",
+    editPhase: "ویرایش بخش",
+    deletePhase: "حذف بخش",
   },
 } as const;
 
@@ -185,16 +217,16 @@ const defaultCardMeta = (): CardMeta => ({
 });
 
 const initialCardMeta: Record<string, CardMeta> = {
-  "card-brief": { tone: "started", priority: "P2", comments: 2, likes: 2, avatar: portraits[0], image: covers.room },
-  "card-interviews": { tone: "started", priority: "P1", comments: 2, likes: 0, avatar: portraits[1] },
-  "card-flow": { tone: "started", priority: "P1", comments: 2, likes: 1, avatar: portraits[2] },
-  "card-copy": { tone: "ongoing", priority: "P2", accent: "green", comments: 7, likes: 4, avatar: portraits[3] },
-  "card-components": { tone: "idle", priority: "P2", accent: "green", comments: 2, likes: 88, avatar: portraits[1], image: covers.lens },
-  "card-board": { tone: "started", priority: "P1", accent: "orange", comments: 2, likes: 1, avatar: portraits[2] },
-  "card-contrast": { tone: "ongoing", priority: "P2", accent: "orange", comments: 7, likes: 97, avatar: portraits[0], image: covers.camera },
-  "card-mobile": { tone: "idle", priority: "P3", comments: 2, likes: 2, avatar: portraits[3] },
-  "card-kickoff": { tone: "ongoing", priority: "P3", accent: "red", comments: 34, likes: 88, avatar: portraits[1] },
-  "card-palette": { tone: "done", priority: "P2", comments: 11, likes: 5, avatar: portraits[2] },
+  "card-brand-concept": { tone: "started", priority: "P1", accent: "orange", comments: 6, likes: 24, avatar: portraits[0], image: covers.room },
+  "card-typography-system": { tone: "started", priority: "P2", comments: 3, likes: 18, avatar: portraits[1] },
+  "card-user-flow": { tone: "ongoing", priority: "P1", accent: "green", comments: 8, likes: 35, avatar: portraits[2] },
+  "card-design-system": { tone: "idle", priority: "P2", comments: 4, likes: 29, avatar: portraits[3], image: covers.lens },
+  "card-components": { tone: "ongoing", priority: "P1", accent: "orange", comments: 14, likes: 78, avatar: portraits[0], image: covers.camera },
+  "card-motion-effects": { tone: "started", priority: "P2", accent: "green", comments: 9, likes: 42, avatar: portraits[1] },
+  "card-backend-api": { tone: "started", priority: "P1", accent: "red", comments: 11, likes: 38, avatar: portraits[2] },
+  "card-ai-copilot": { tone: "ongoing", priority: "P2", comments: 15, likes: 56, avatar: portraits[3] },
+  "card-docker-deploy": { tone: "done", priority: "P2", accent: "green", comments: 19, likes: 92, avatar: portraits[0], image: covers.room },
+  "card-performance-seo": { tone: "done", priority: "P1", accent: "red", comments: 27, likes: 145, avatar: portraits[1] },
 };
 
 const coverKeys: CoverKey[] = ["room", "lens", "camera"];
@@ -207,6 +239,7 @@ function BoardCard({
   index,
   locale,
   labels,
+  phases,
   meta,
   liked,
   likeCount,
@@ -218,17 +251,23 @@ function BoardCard({
   index: number;
   locale: Locale;
   labels: Copy;
-  meta: CardMeta;
+  phases: Phase[];
+  meta?: CardMeta;
   liked: boolean;
   likeCount: number;
   onLike: (cardId: string) => void;
-  onSave: (cardId: string, title: string, details: string, meta: CardMeta) => void;
+  onSave: (cardId: string, title: string, details: string, meta: CardMeta, phase?: PhaseId) => void;
   onDelete: (cardId: string) => void;
 }) {
+  const safeMeta = meta || defaultCardMeta();
+  const cardTitle = getLocalizedText(card.title, locale);
+  const cardDetails = getLocalizedText(card.details, locale);
+  const phaseInfo = card.phase ? phases.find((p) => p.id === card.phase) : null;
   const [isEditing, setIsEditing] = useState(false);
-  const [title, setTitle] = useState(card.title[locale]);
-  const [details, setDetails] = useState(card.details[locale]);
-  const [draft, setDraft] = useState<CardMeta>(meta);
+  const [title, setTitle] = useState(cardTitle);
+  const [details, setDetails] = useState(cardDetails);
+  const [draft, setDraft] = useState<CardMeta>(safeMeta);
+  const [draftPhase, setDraftPhase] = useState<PhaseId>(card.phase || "brand");
   const editTitleId = useId();
   const editDetailsId = useId();
   const { ref, isDragging, isDragSource } = useSortable({
@@ -240,14 +279,24 @@ function BoardCard({
     disabled: isEditing,
     plugins: (defaults) => [...defaults, Feedback.configure({ feedback: "clone" })],
   });
-  const toneLabel = labels[meta.tone];
+  const safeTone = safeMeta?.tone && labels[safeMeta.tone] ? safeMeta.tone : "idle";
+  const toneLabel = labels[safeTone];
   const coverKey =
-    meta.image === covers.room ? "room" : meta.image === covers.lens ? "lens" : meta.image === covers.camera ? "camera" : "none";
+    safeMeta.image === covers.room
+      ? "room"
+      : safeMeta.image === covers.lens
+        ? "lens"
+        : safeMeta.image === covers.camera
+          ? "camera"
+          : "none";
 
   function openEdit() {
-    setTitle(card.title[locale]);
-    setDetails(card.details[locale]);
-    setDraft(meta);
+    const currentTitle = getLocalizedText(card.title, locale);
+    const currentDetails = getLocalizedText(card.details, locale);
+    setTitle(currentTitle);
+    setDetails(currentDetails);
+    setDraft(safeMeta);
+    setDraftPhase(card.phase || "brand");
     setIsEditing(true);
   }
 
@@ -257,7 +306,7 @@ function BoardCard({
 
   function saveEdit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    onSave(card.id, title, details, draft);
+    onSave(card.id, title, details, draft, draftPhase);
     setIsEditing(false);
   }
 
@@ -269,10 +318,10 @@ function BoardCard({
       role="listitem"
     >
       <article
-        className={`task-card${isDragging ? " is-dragging" : ""}${isEditing ? " is-editing" : ""}${meta.image ? " has-cover" : ""}${meta.accent ? ` accent-${meta.accent}` : ""}`}
+        className={`task-card${isDragging ? " is-dragging" : ""}${isEditing ? " is-editing" : ""}${safeMeta.image ? " has-cover" : ""}${safeMeta.accent ? ` accent-${safeMeta.accent}` : ""}`}
         dir={locale === "fa" ? "rtl" : "ltr"}
         data-card-id={card.id}
-        aria-label={`${labels.drag}: ${card.title[locale]}`}
+        aria-label={`${labels.drag}: ${cardTitle}`}
       >
         {isEditing ? (
           <form className="card-edit-form" onSubmit={saveEdit}>
@@ -348,6 +397,18 @@ function BoardCard({
                 </button>
               ))}
             </div>
+            <label htmlFor={`${editTitleId}-phase`}>{locale === "fa" ? "بخش کاری" : "Phase"}</label>
+            <select
+              id={`${editTitleId}-phase`}
+              value={draftPhase}
+              onChange={(event) => setDraftPhase(event.target.value as PhaseId)}
+            >
+              {phases.map((phase) => (
+                <option key={phase.id} value={phase.id}>
+                  {getLocalizedText(phase.label, locale)}
+                </option>
+              ))}
+            </select>
             <label htmlFor={`${editTitleId}-cover`}>{labels.cover}</label>
             <select
               id={`${editTitleId}-cover`}
@@ -375,28 +436,33 @@ function BoardCard({
           </form>
         ) : (
           <>
-            {meta.image ? <img className="card-cover" src={meta.image} alt="" draggable={false} /> : null}
-            {meta.accent && !meta.image ? <span className="card-accent" aria-hidden="true" /> : null}
-            <h3>{card.title[locale]}</h3>
-            {card.details[locale] ? <p>{card.details[locale]}</p> : null}
+            {safeMeta.image ? <img className="card-cover" src={safeMeta.image} alt="" draggable={false} /> : null}
+            {safeMeta.accent && !safeMeta.image ? <span className="card-accent" aria-hidden="true" /> : null}
+            <h3>{cardTitle}</h3>
+            {cardDetails ? <p>{cardDetails}</p> : null}
             <div className="card-pills">
-              <span className={`pill tone-${meta.tone}`}>{toneLabel}</span>
-              <span className={`pill priority-${meta.priority.toLowerCase()}`}>{meta.priority}</span>
+              {phaseInfo ? (
+                <span className={`pill ${phaseInfo.badgeClass}`}>
+                  {getLocalizedText(phaseInfo.label, locale)}
+                </span>
+              ) : null}
+              <span className={`pill tone-${safeMeta.tone}`}>{toneLabel}</span>
+              <span className={`pill priority-${safeMeta.priority.toLowerCase()}`}>{safeMeta.priority}</span>
             </div>
             <div className="card-foot">
               <span className="avatar" aria-hidden="true">
-                <img src={meta.avatar} alt="" />
+                <img src={safeMeta.avatar} alt="" />
               </span>
               <span className="card-date">{labels.date}</span>
               <span className="card-stat">
                 <MessageCircle size={13} strokeWidth={2} aria-hidden="true" />
-                {meta.comments}
+                {safeMeta.comments}
               </span>
               <button
                 className={`card-stat like-button${liked ? " is-liked" : ""}`}
                 type="button"
                 aria-pressed={liked}
-                aria-label={`${labels.like} ${card.title[locale]}`}
+                aria-label={`${labels.like} ${cardTitle}`}
                 onClick={() => onLike(card.id)}
               >
                 <ThumbsUp size={13} strokeWidth={2} aria-hidden="true" />
@@ -407,7 +473,7 @@ function BoardCard({
               <button
                 className="icon-button edit-button"
                 type="button"
-                aria-label={`${labels.edit}: ${card.title[locale]}`}
+                aria-label={`${labels.edit}: ${cardTitle}`}
                 onClick={openEdit}
               >
                 <Pencil size={14} strokeWidth={2.1} aria-hidden="true" />
@@ -415,7 +481,7 @@ function BoardCard({
               <button
                 className="icon-button delete-button"
                 type="button"
-                aria-label={`${labels.delete} ${card.title[locale]}`}
+                aria-label={`${labels.delete} ${cardTitle}`}
                 onClick={() => onDelete(card.id)}
               >
                 <X size={14} strokeWidth={2.2} aria-hidden="true" />
@@ -433,12 +499,15 @@ function BoardColumn({
   cards,
   locale,
   labels,
+  phases,
   likedIds,
   onLike,
   onSaveCard,
   onRename,
   onAdd,
   onDelete,
+  canDeleteColumn,
+  onDeleteColumn,
   cardMeta,
   searchQuery,
   view,
@@ -447,19 +516,23 @@ function BoardColumn({
   cards: Card[];
   locale: Locale;
   labels: Copy;
+  phases: Phase[];
   likedIds: Record<string, boolean>;
   cardMeta: Record<string, CardMeta>;
   onLike: (cardId: string) => void;
-  onSaveCard: (cardId: string, title: string, details: string, meta: CardMeta) => void;
+  onSaveCard: (cardId: string, title: string, details: string, meta: CardMeta, phase?: PhaseId) => void;
   onRename: (columnId: string, name: string) => void;
   onAdd: (columnId: string, title: string, details: string) => void;
   onDelete: (cardId: string) => void;
+  canDeleteColumn?: boolean;
+  onDeleteColumn?: (columnId: string) => void;
   searchQuery: string;
   view: BoardView;
 }) {
   const isFiltering = searchQuery.trim().length > 0;
   const [isRenaming, setIsRenaming] = useState(false);
-  const [name, setName] = useState(column.name[locale]);
+  const columnName = getLocalizedText(column.name, locale);
+  const [name, setName] = useState("");
   const [isAdding, setIsAdding] = useState(false);
   const [title, setTitle] = useState("");
   const [details, setDetails] = useState("");
@@ -470,13 +543,19 @@ function BoardColumn({
     data: { kind: "column", columnId: column.id },
   });
 
+  function startRename() {
+    setName(columnName);
+    setIsRenaming(true);
+  }
+
   function saveName() {
-    onRename(column.id, name);
+    if (name.trim()) {
+      onRename(column.id, name);
+    }
     setIsRenaming(false);
   }
 
   function cancelName() {
-    setName(column.name[locale]);
     setIsRenaming(false);
   }
 
@@ -492,7 +571,7 @@ function BoardColumn({
     <section
       ref={dropRef}
       className={`board-column${view === "list" ? " is-list" : ""}${isDropTarget ? " is-drop-target" : ""}`}
-      aria-label={column.name[locale]}
+      aria-label={columnName}
       data-column-id={column.id}
     >
       <header className="column-header">
@@ -514,7 +593,7 @@ function BoardColumn({
             </button>
           </div>
         ) : (
-          <h2>{column.name[locale]}</h2>
+          <h2>{columnName}</h2>
         )}
         <div className="column-tools">
           <button className="icon-button" type="button" aria-label={labels.addCard} onClick={() => setIsAdding(true)}>
@@ -523,14 +602,21 @@ function BoardColumn({
           <button
             className="icon-button"
             type="button"
-            aria-label={`${labels.rename}: ${column.name[locale]}`}
-            onClick={() => {
-              setName(column.name[locale]);
-              setIsRenaming(true);
-            }}
+            aria-label={`${labels.rename}: ${columnName}`}
+            onClick={startRename}
           >
-            <MoreHorizontal size={16} strokeWidth={2.1} aria-hidden="true" />
+            <Pencil size={14} strokeWidth={2.1} aria-hidden="true" />
           </button>
+          {canDeleteColumn && onDeleteColumn ? (
+            <button
+              className="icon-button delete-col-btn"
+              type="button"
+              aria-label={`${labels.deleteColumn}: ${columnName}`}
+              onClick={() => onDeleteColumn(column.id)}
+            >
+              <Trash2 size={14} strokeWidth={2.1} aria-hidden="true" />
+            </button>
+          ) : null}
         </div>
       </header>
 
@@ -545,6 +631,7 @@ function BoardColumn({
             index={index}
             locale={locale}
             labels={labels}
+            phases={phases}
             meta={cardMeta[card.id] ?? defaultCardMeta()}
             liked={likedIds[card.id] ?? false}
             likeCount={(cardMeta[card.id]?.likes ?? 0) + (likedIds[card.id] ? 1 : 0)}
@@ -599,36 +686,138 @@ function BoardColumn({
   );
 }
 
-export default function BoardPage() {
-  const [board, setBoard] = useState<BoardState>(() => ({
+function generateCardId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    try {
+      return crypto.randomUUID();
+    } catch {
+      // Fallback if randomUUID fails in restricted context
+    }
+  }
+  return `card-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function getSavedBoard(): BoardState {
+  if (typeof window !== "undefined") {
+    try {
+      const version = localStorage.getItem(BOARD_VERSION_KEY);
+      if (version === CURRENT_BOARD_VERSION) {
+        const raw = localStorage.getItem(BOARD_STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && Array.isArray(parsed.columns) && Array.isArray(parsed.cards)) {
+            return parsed;
+          }
+        }
+      } else {
+        localStorage.setItem(BOARD_VERSION_KEY, CURRENT_BOARD_VERSION);
+      }
+    } catch {
+      // Fallback
+    }
+  }
+  return {
     columns: initialBoard.columns.map((column) => ({ ...column, name: { ...column.name } })),
     cards: initialBoard.cards.map((card) => ({
       ...card,
       title: { ...card.title },
       details: { ...card.details },
     })),
-  }));
-  const [locale, setLocale] = useState<Locale>("en");
+  };
+}
+
+function getSavedCardMeta(): Record<string, CardMeta> {
+  if (typeof window !== "undefined") {
+    try {
+      const version = localStorage.getItem(BOARD_VERSION_KEY);
+      if (version === CURRENT_BOARD_VERSION) {
+        const raw = localStorage.getItem(CARD_META_STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === "object") {
+            return { ...initialCardMeta, ...parsed };
+          }
+        }
+      }
+    } catch {
+      // Fallback
+    }
+  }
+  return { ...initialCardMeta };
+}
+
+export default function BoardPage() {
+  const { isAuthenticated, logout } = useAuthSession();
+  const [board, setBoard] = useState<BoardState>(getSavedBoard);
+  const [cardMeta, setCardMeta] = useState<Record<string, CardMeta>>(getSavedCardMeta);
+  const [locale, setLocale] = useState<Locale>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("kanban_locale");
+        if (saved === "en" || saved === "fa") return saved;
+      } catch {
+        // Ignore storage errors
+      }
+    }
+    return "fa";
+  });
   const [likedIds, setLikedIds] = useState<Record<string, boolean>>({});
-  const [cardMeta, setCardMeta] = useState<Record<string, CardMeta>>(() => ({ ...initialCardMeta }));
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedPhase, setSelectedPhase] = useState<PhaseId | "all">("all");
   const [activeView, setActiveView] = useState<BoardView>("board");
+  const [isCreatingColumn, setIsCreatingColumn] = useState(false);
+  const [newColumnName, setNewColumnName] = useState("");
+  const [isCreatingPhase, setIsCreatingPhase] = useState(false);
+  const [newPhaseName, setNewPhaseName] = useState("");
+  const [editingPhaseId, setEditingPhaseId] = useState<string | null>(null);
+  const [editPhaseName, setEditPhaseName] = useState("");
+  const currentPhases = getBoardPhases(board);
   const labels = copy[locale];
   const normalizedSearch = searchQuery.trim();
+
+  // Save board changes to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(BOARD_STORAGE_KEY, JSON.stringify(board));
+    } catch {
+      // Ignore quota errors
+    }
+  }, [board]);
+
+  // Save card metadata to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(CARD_META_STORAGE_KEY, JSON.stringify(cardMeta));
+    } catch {
+      // Ignore quota errors
+    }
+  }, [cardMeta]);
 
   useEffect(() => {
     const isFa = locale === "fa";
     document.documentElement.lang = locale;
     document.documentElement.dir = isFa ? "rtl" : "ltr";
     document.body.classList.toggle("locale-fa", isFa);
+    document.body.classList.toggle("locale-en", !isFa);
+    try {
+      localStorage.setItem("kanban_locale", locale);
+    } catch {
+      // Ignore storage errors
+    }
   }, [locale]);
 
   function onLike(cardId: string) {
     setLikedIds((current) => ({ ...current, [cardId]: !current[cardId] }));
   }
 
-  function onSaveCard(cardId: string, title: string, details: string, meta: CardMeta) {
-    setBoard((current) => updateCard(current, cardId, title, details, locale));
+  function onSaveCard(
+    cardId: string,
+    title: string,
+    details: string,
+    meta: CardMeta,
+    phase?: PhaseId,
+  ) {
+    setBoard((current) => updateCard(current, cardId, title, details, locale, phase));
     setCardMeta((current) => ({ ...current, [cardId]: meta }));
   }
 
@@ -658,6 +847,16 @@ export default function BoardPage() {
     setBoard((current) => moveCard(current, cardId, targetColumnId, beforeCardId));
   }
 
+  if (!isAuthenticated) {
+    return (
+      <LoginForm
+        locale={locale}
+        onLocaleChange={setLocale}
+        onLoginSuccess={() => {}}
+      />
+    );
+  }
+
   return (
     <main className="app-shell" dir={locale === "fa" ? "rtl" : "ltr"} lang={locale}>
       <aside className="sidebar" aria-label={labels.nav}>
@@ -682,6 +881,15 @@ export default function BoardPage() {
           </button>
         </nav>
         <div className="side-bottom">
+          <button
+            type="button"
+            className="side-link"
+            aria-label={labels.logout}
+            title={labels.logout}
+            onClick={logout}
+          >
+            <LogOut size={18} strokeWidth={2} />
+          </button>
           <button type="button" className="side-link" aria-label={labels.settings}>
             <Settings size={18} strokeWidth={2} />
           </button>
@@ -747,6 +955,16 @@ export default function BoardPage() {
                   FA
                 </button>
               </div>
+              <button
+                type="button"
+                className="logout-button"
+                onClick={logout}
+                aria-label={labels.logout}
+                title={labels.logout}
+              >
+                <LogOut size={14} aria-hidden="true" />
+                <span>{labels.logout}</span>
+              </button>
             </div>
           </div>
 
@@ -788,6 +1006,159 @@ export default function BoardPage() {
               <ChevronDown size={14} strokeWidth={2.2} aria-hidden="true" />
             </button>
           </div>
+
+          <div
+            className="phase-tabs-row"
+            role="tablist"
+            aria-label={locale === "fa" ? "فازهای کاری" : "Workflow Phases"}
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={selectedPhase === "all"}
+              className={`phase-tab${selectedPhase === "all" ? " is-active" : ""}`}
+              onClick={() => setSelectedPhase("all")}
+            >
+              <span>{locale === "fa" ? "همه بخش‌ها" : "All Phases"}</span>
+              <span className="phase-tab-count">{board.cards.length}</span>
+            </button>
+            {currentPhases.map((phase) => {
+              const isEditingThisPhase = editingPhaseId === phase.id;
+              const count = board.cards.filter((c) => c.phase === phase.id).length;
+
+              if (isEditingThisPhase) {
+                return (
+                  <form
+                    key={phase.id}
+                    className="phase-tab-edit-form"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (editPhaseName.trim()) {
+                        setBoard((current) => renamePhase(current, phase.id, editPhaseName, locale));
+                      }
+                      setEditingPhaseId(null);
+                    }}
+                  >
+                    <input
+                      autoFocus
+                      maxLength={30}
+                      value={editPhaseName}
+                      onChange={(e) => setEditPhaseName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Escape") setEditingPhaseId(null);
+                      }}
+                    />
+                    <button type="submit" className="icon-button" aria-label={labels.save}>
+                      <Check size={14} aria-hidden="true" />
+                    </button>
+                    {currentPhases.length > 1 ? (
+                      <button
+                        type="button"
+                        className="icon-button delete-phase-icon"
+                        aria-label={labels.deletePhase}
+                        onClick={() => {
+                          setBoard((current) => deletePhase(current, phase.id));
+                          if (selectedPhase === phase.id) setSelectedPhase("all");
+                          setEditingPhaseId(null);
+                        }}
+                      >
+                        <Trash2 size={13} aria-hidden="true" />
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      className="icon-button"
+                      aria-label={labels.cancel}
+                      onClick={() => setEditingPhaseId(null)}
+                    >
+                      <X size={14} aria-hidden="true" />
+                    </button>
+                  </form>
+                );
+              }
+
+              return (
+                <div key={phase.id} className="phase-tab-wrapper">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={selectedPhase === phase.id}
+                    className={`phase-tab${selectedPhase === phase.id ? " is-active" : ""}`}
+                    onClick={() => setSelectedPhase(phase.id)}
+                  >
+                    <span>{getLocalizedText(phase.label, locale)}</span>
+                    <span className="phase-tab-count">{count}</span>
+                  </button>
+                  {selectedPhase === phase.id ? (
+                    <button
+                      type="button"
+                      className="phase-tab-edit-trigger"
+                      aria-label={`${labels.editPhase}: ${getLocalizedText(phase.label, locale)}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditPhaseName(getLocalizedText(phase.label, locale));
+                        setEditingPhaseId(phase.id);
+                      }}
+                    >
+                      <Pencil size={11} strokeWidth={2.2} aria-hidden="true" />
+                    </button>
+                  ) : null}
+                </div>
+              );
+            })}
+
+            {isCreatingPhase ? (
+              <form
+                className="phase-tab-edit-form"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (newPhaseName.trim()) {
+                    setBoard((current) => addPhase(current, newPhaseName, locale));
+                    setNewPhaseName("");
+                    setIsCreatingPhase(false);
+                  }
+                }}
+              >
+                <input
+                  autoFocus
+                  maxLength={30}
+                  placeholder={labels.newPhasePlaceholder}
+                  value={newPhaseName}
+                  onChange={(e) => setNewPhaseName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") {
+                      setIsCreatingPhase(false);
+                      setNewPhaseName("");
+                    }
+                  }}
+                />
+                <button type="submit" className="icon-button" aria-label={labels.save}>
+                  <Check size={14} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  className="icon-button"
+                  aria-label={labels.cancel}
+                  onClick={() => {
+                    setIsCreatingPhase(false);
+                    setNewPhaseName("");
+                  }}
+                >
+                  <X size={14} aria-hidden="true" />
+                </button>
+              </form>
+            ) : (
+              <button
+                type="button"
+                className="phase-tab add-phase-tab"
+                onClick={() => setIsCreatingPhase(true)}
+                aria-label={labels.addPhase}
+              >
+                <Plus size={14} strokeWidth={2.2} aria-hidden="true" />
+                <span>{labels.addPhase}</span>
+              </button>
+            )}
+          </div>
         </header>
 
         <DragDropProvider onDragEnd={finishDrag}>
@@ -801,9 +1172,16 @@ export default function BoardPage() {
                   key={column.id}
                   column={column}
                   view={activeView}
+                  phases={currentPhases}
+                  canDeleteColumn={board.columns.length > 1}
+                  onDeleteColumn={(columnId) => {
+                    setBoard((current) => deleteColumn(current, columnId));
+                  }}
                   cards={board.cards.filter(
                     (card) =>
-                      card.columnId === column.id && matchesCardSearch(card, normalizedSearch),
+                      card.columnId === column.id &&
+                      (selectedPhase === "all" || card.phase === selectedPhase) &&
+                      matchesCardSearch(card, normalizedSearch),
                   )}
                   searchQuery={normalizedSearch}
                   locale={locale}
@@ -816,13 +1194,72 @@ export default function BoardPage() {
                     setBoard((current) => renameColumn(current, columnId, name, locale))
                   }
                   onAdd={(columnId, title, details) => {
-                    const id = crypto.randomUUID();
-                    setBoard((current) => addCard(current, columnId, title, details, id));
+                    const id = generateCardId();
+                    const cardPhase = selectedPhase !== "all" ? selectedPhase : "brand";
+                    setBoard((current) => addCard(current, columnId, title, details, id, cardPhase));
                     setCardMeta((current) => ({ ...current, [id]: defaultCardMeta() }));
                   }}
                   onDelete={onDeleteCard}
                 />
               ))}
+
+              {activeView === "board" ? (
+                isCreatingColumn ? (
+                  <form
+                    className="board-column add-column-card is-editing"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (newColumnName.trim()) {
+                        setBoard((current) => addColumn(current, newColumnName, locale));
+                        setNewColumnName("");
+                        setIsCreatingColumn(false);
+                      }
+                    }}
+                  >
+                    <div className="add-column-form">
+                      <input
+                        autoFocus
+                        required
+                        maxLength={40}
+                        value={newColumnName}
+                        placeholder={labels.newColumnPlaceholder}
+                        onChange={(e) => setNewColumnName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Escape") {
+                            setIsCreatingColumn(false);
+                            setNewColumnName("");
+                          }
+                        }}
+                      />
+                      <div className="form-actions">
+                        <button className="share-button compact" type="submit">
+                          {labels.save}
+                        </button>
+                        <button
+                          className="icon-button"
+                          type="button"
+                          aria-label={labels.cancel}
+                          onClick={() => {
+                            setIsCreatingColumn(false);
+                            setNewColumnName("");
+                          }}
+                        >
+                          <X size={16} aria-hidden="true" />
+                        </button>
+                      </div>
+                    </div>
+                  </form>
+                ) : (
+                  <button
+                    type="button"
+                    className="add-column-button"
+                    onClick={() => setIsCreatingColumn(true)}
+                  >
+                    <Plus size={18} strokeWidth={2.2} aria-hidden="true" />
+                    <span>{labels.addColumn}</span>
+                  </button>
+                )
+              ) : null}
             </div>
           </section>
         </DragDropProvider>
