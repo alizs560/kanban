@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
 import {
   Calendar,
   Check,
@@ -23,12 +23,13 @@ import { Feedback } from "@dnd-kit/dom";
 import { DragDropProvider, useDroppable, type DragEndEvent } from "@dnd-kit/react";
 import { useSortable } from "@dnd-kit/react/sortable";
 import { useAuthSession } from "@/lib/auth";
+import { useCardTilt, animateLikeButton, animateCardsEntrance } from "@/lib/animations";
 import { LoginForm } from "./LoginForm";
 import { TimelineView } from "./TimelineView";
 import { CalendarView } from "./CalendarView";
 import { ProgressView } from "./ProgressView";
 import { AppSidebar, type SidebarTab } from "./AppSidebar";
-import { AppNavbar } from "./AppNavbar";
+import { AppNavbar, type Theme } from "./AppNavbar";
 import {
   BOARD_STORAGE_KEY,
   BOARD_VERSION_KEY,
@@ -53,6 +54,7 @@ import {
   type Card,
   type Column,
   type Locale,
+  type LocalizedText,
   type Phase,
   type PhaseId,
 } from "@/lib/board";
@@ -114,6 +116,16 @@ const copy = {
     timeline: "Timeline",
     calendar: "Calendar",
     progress: "Progress",
+    soloMode: "Solo mode",
+    teamMode: "Team mode",
+    soloModeHint: "A simpler board for focused individual work",
+    soloBacklog: "Backlog",
+    soloTodo: "To do",
+    soloDoing: "In progress",
+    soloDone: "Complete",
+    soloAddCard: "Add card",
+    soloAddPlaceholder: "What needs to be done?",
+    soloTrash: "Drop here to delete",
     nav: "Project navigation",
     home: "Home",
     members: "Members",
@@ -218,6 +230,16 @@ const copy = {
     timeline: "خط زمان",
     calendar: "تقویم",
     progress: "پیشرفت",
+    soloMode: "حالت انفرادی",
+    teamMode: "حالت تیمی",
+    soloModeHint: "یک تخته ساده‌تر برای تمرکز روی کارهای شخصی",
+    soloBacklog: "ایده‌ها",
+    soloTodo: "لیست کارها",
+    soloDoing: "در حال انجام",
+    soloDone: "تکمیل شده",
+    soloAddCard: "افزودن کارت",
+    soloAddPlaceholder: "چه کاری باید انجام شود؟",
+    soloTrash: "برای حذف اینجا رها کنید",
     nav: "ناوبری پروژه",
     home: "خانه",
     members: "اعضا",
@@ -270,6 +292,7 @@ const copy = {
 
 export type Copy = (typeof copy)[Locale];
 export type BoardView = "board" | "list" | "timeline" | "calendar" | "progress";
+export type WorkspaceMode = "team" | "solo";
 export type Tone = "started" | "ongoing" | "idle" | "done";
 export type Priority = "P1" | "P2" | "P3";
 export type Accent = "green" | "orange" | "red";
@@ -398,6 +421,8 @@ function BoardCard({
   const safeTone = safeMeta?.tone && labels[safeMeta.tone] ? safeMeta.tone : "idle";
   const toneLabel = labels[safeTone];
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const likeBtnRef = useRef<HTMLButtonElement>(null);
+  const tiltRef = useCardTilt<HTMLElement>(isDragging || isEditing);
 
   function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -467,6 +492,7 @@ function BoardCard({
       role="listitem"
     >
       <article
+        ref={tiltRef}
         className={`task-card${isDragging ? " is-dragging" : ""}${isEditing ? " is-editing" : ""}${safeMeta.image && !isEditing ? " has-cover" : ""}${safeMeta.accent ? ` accent-${safeMeta.accent}` : ""}`}
         dir={locale === "fa" ? "rtl" : "ltr"}
         data-card-id={card.id}
@@ -732,11 +758,15 @@ function BoardCard({
                 {safeMeta.comments}
               </span>
               <button
+                ref={likeBtnRef}
                 className={`card-stat like-button${liked ? " is-liked" : ""}`}
                 type="button"
                 aria-pressed={liked}
                 aria-label={`${labels.like} ${cardTitle}`}
-                onClick={() => onLike(card.id)}
+                onClick={() => {
+                  animateLikeButton(likeBtnRef.current);
+                  onLike(card.id);
+                }}
               >
                 <ThumbsUp size={13} strokeWidth={2} aria-hidden="true" />
                 {likeCount}
@@ -1019,6 +1049,173 @@ function getSavedCardMeta(): Record<string, CardMeta> {
   return { ...initialCardMeta };
 }
 
+type SoloColumnId = "backlog" | "todo" | "doing" | "done";
+type SoloCard = { id: string; title: LocalizedText; column: SoloColumnId };
+
+const SOLO_STORAGE_KEY = "kanban_solo_cards";
+const soloColumns: { id: SoloColumnId; label: keyof Copy; color: string }[] = [
+  { id: "backlog", label: "soloBacklog", color: "solo-column-muted" },
+  { id: "todo", label: "soloTodo", color: "solo-column-yellow" },
+  { id: "doing", label: "soloDoing", color: "solo-column-blue" },
+  { id: "done", label: "soloDone", color: "solo-column-green" },
+];
+
+const initialSoloCards: SoloCard[] = [
+  { id: "solo-1", title: { en: "Capture new ideas", fa: "ثبت ایده‌های جدید" }, column: "backlog" },
+  { id: "solo-2", title: { en: "Plan the next milestone", fa: "برنامه‌ریزی مرحله بعد" }, column: "todo" },
+  { id: "solo-3", title: { en: "Finish the current task", fa: "تکمیل کار فعلی" }, column: "doing" },
+  { id: "solo-4", title: { en: "Review completed work", fa: "مرور کارهای تکمیل‌شده" }, column: "done" },
+];
+
+function getSavedSoloCards(): SoloCard[] {
+  if (typeof window !== "undefined") {
+    try {
+      const raw = localStorage.getItem(SOLO_STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (Array.isArray(parsed)) {
+        return parsed.filter(
+          (card): card is SoloCard =>
+            Boolean(card && typeof card.id === "string" && typeof card.title === "object" && card.column),
+        );
+      }
+    } catch {
+      // Use the starter cards when solo storage is unavailable.
+    }
+  }
+  return initialSoloCards;
+}
+
+function SoloBoard({
+  locale,
+  labels,
+  cards,
+  setCards,
+}: {
+  locale: Locale;
+  labels: Copy;
+  cards: SoloCard[];
+  setCards: Dispatch<SetStateAction<SoloCard[]>>;
+}) {
+  const [activeTarget, setActiveTarget] = useState<SoloColumnId | "trash" | null>(null);
+  const [addingTo, setAddingTo] = useState<SoloColumnId | null>(null);
+  const [newTitle, setNewTitle] = useState("");
+
+  function addSoloCard(event: FormEvent<HTMLFormElement>, column: SoloColumnId) {
+    event.preventDefault();
+    const title = newTitle.trim();
+    if (!title) return;
+    setCards((current) => [
+      ...current,
+      { id: generateCardId(), title: { en: title, fa: title }, column },
+    ]);
+    setNewTitle("");
+    setAddingTo(null);
+  }
+
+  function moveSoloCard(cardId: string, column: SoloColumnId) {
+    setCards((current) => current.map((card) => (card.id === cardId ? { ...card, column } : card)));
+    setActiveTarget(null);
+  }
+
+  function deleteSoloCard(cardId: string) {
+    setCards((current) => current.filter((card) => card.id !== cardId));
+    setActiveTarget(null);
+  }
+
+  return (
+    <section className="solo-board-shell" aria-label={labels.soloModeHint} dir={locale === "fa" ? "rtl" : "ltr"}>
+      <div className="solo-board-header">
+        <div>
+          <span className="solo-eyebrow">{labels.soloMode}</span>
+          <h2>{locale === "fa" ? "تمرکز روی کارهای خودت" : "Focus on your own work"}</h2>
+          <p>{labels.soloModeHint}</p>
+        </div>
+        <span className="solo-card-count">{cards.length} {locale === "fa" ? "کارت" : "cards"}</span>
+      </div>
+
+      <div className="solo-board-grid">
+        {soloColumns.map((column) => {
+          const columnCards = cards.filter((card) => card.column === column.id);
+          return (
+            <section
+              key={column.id}
+              className={`solo-column ${column.color}${activeTarget === column.id ? " is-active" : ""}`}
+              onDragOver={(event) => {
+                event.preventDefault();
+                setActiveTarget(column.id);
+              }}
+              onDragLeave={() => setActiveTarget(null)}
+              onDrop={(event) => {
+                event.preventDefault();
+                const cardId = event.dataTransfer.getData("solo-card-id");
+                if (cardId) moveSoloCard(cardId, column.id);
+              }}
+            >
+              <header className="solo-column-header">
+                <h3>{labels[column.label]}</h3>
+                <span>{columnCards.length}</span>
+              </header>
+              <div className="solo-card-list">
+                {columnCards.map((card) => (
+                  <article
+                    key={card.id}
+                    className="solo-card"
+                    draggable
+                    onDragStart={(event) => {
+                      event.dataTransfer.setData("solo-card-id", card.id);
+                      event.dataTransfer.effectAllowed = "move";
+                    }}
+                    aria-label={getLocalizedText(card.title, locale)}
+                  >
+                    <span>{getLocalizedText(card.title, locale)}</span>
+                  </article>
+                ))}
+                {addingTo === column.id ? (
+                  <form className="solo-add-form" onSubmit={(event) => addSoloCard(event, column.id)}>
+                    <label className="sr-only" htmlFor={`solo-title-${column.id}`}>{labels.soloAddCard}</label>
+                    <textarea
+                      id={`solo-title-${column.id}`}
+                      autoFocus
+                      rows={2}
+                      value={newTitle}
+                      placeholder={labels.soloAddPlaceholder}
+                      onChange={(event) => setNewTitle(event.target.value)}
+                    />
+                    <div className="solo-form-actions">
+                      <button type="submit">{labels.soloAddCard}</button>
+                      <button type="button" onClick={() => { setAddingTo(null); setNewTitle(""); }}>{labels.cancel}</button>
+                    </div>
+                  </form>
+                ) : (
+                  <button type="button" className="solo-add-button" onClick={() => setAddingTo(column.id)}>
+                    <Plus size={15} aria-hidden="true" />
+                    {labels.soloAddCard}
+                  </button>
+                )}
+              </div>
+            </section>
+          );
+        })}
+        <button
+          type="button"
+          className={`solo-trash${activeTarget === "trash" ? " is-active" : ""}`}
+          onDragOver={(event) => { event.preventDefault(); setActiveTarget("trash"); }}
+          onDragLeave={() => setActiveTarget(null)}
+          onDrop={(event) => {
+            event.preventDefault();
+            const cardId = event.dataTransfer.getData("solo-card-id");
+            if (cardId) deleteSoloCard(cardId);
+          }}
+          aria-label={labels.soloTrash}
+        >
+          <Trash2 size={26} aria-hidden="true" />
+          <span>{labels.soloTrash}</span>
+        </button>
+      </div>
+    </section>
+  );
+}
+
 export default function BoardPage() {
   const { isAuthenticated, logout } = useAuthSession();
   const [board, setBoard] = useState<BoardState>(getSavedBoard);
@@ -1038,6 +1235,19 @@ export default function BoardPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPhase, setSelectedPhase] = useState<PhaseId | "all">("all");
   const [activeView, setActiveView] = useState<BoardView>("board");
+  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("team");
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const savedTheme = localStorage.getItem("loom-theme");
+        if (savedTheme === "light" || savedTheme === "dark") return savedTheme;
+      } catch {
+        // Ignore storage errors and keep the dark default.
+      }
+    }
+    return "dark";
+  });
+  const [soloCards, setSoloCards] = useState<SoloCard[]>(getSavedSoloCards);
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("home");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -1082,6 +1292,14 @@ export default function BoardPage() {
   }, [cardMeta]);
 
   useEffect(() => {
+    try {
+      localStorage.setItem(SOLO_STORAGE_KEY, JSON.stringify(soloCards));
+    } catch {
+      // Ignore quota errors
+    }
+  }, [soloCards]);
+
+  useEffect(() => {
     const isFa = locale === "fa";
     document.documentElement.lang = locale;
     document.documentElement.dir = isFa ? "rtl" : "ltr";
@@ -1095,6 +1313,15 @@ export default function BoardPage() {
   }, [locale]);
 
   useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    try {
+      localStorage.setItem("loom-theme", theme);
+    } catch {
+      // Ignore storage errors.
+    }
+  }, [theme]);
+
+  useEffect(() => {
     if (!isShareOpen) return;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") setIsShareOpen(false);
@@ -1102,6 +1329,12 @@ export default function BoardPage() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isShareOpen]);
+
+  useEffect(() => {
+    if (activeView === "board") {
+      animateCardsEntrance(".task-card");
+    }
+  }, [selectedPhase, activeView]);
 
   async function copyShareLink() {
     const link = window.location.href;
@@ -1210,9 +1443,17 @@ export default function BoardPage() {
             setSidebarTab("ai");
             setIsSidebarOpen(true);
           }}
+          workspaceMode={workspaceMode}
+          onWorkspaceModeChange={setWorkspaceMode}
+          theme={theme}
+          onThemeChange={setTheme}
         />
 
-        {isShareOpen ? (
+        {workspaceMode === "solo" ? (
+          <SoloBoard locale={locale} labels={labels} cards={soloCards} setCards={setSoloCards} />
+        ) : null}
+
+        {workspaceMode === "team" && isShareOpen ? (
           <div className="share-modal-backdrop" role="presentation" onMouseDown={() => setIsShareOpen(false)}>
             <section
               className="share-modal"
@@ -1328,7 +1569,7 @@ export default function BoardPage() {
           </div>
         ) : null}
 
-        {activeView === "timeline" ? (
+        {workspaceMode === "team" && activeView === "timeline" ? (
           <section className="board-scroll" aria-label={labels.timeline}>
             <TimelineView
               cards={filteredCards}
@@ -1339,7 +1580,7 @@ export default function BoardPage() {
               labels={labels}
             />
           </section>
-        ) : activeView === "calendar" ? (
+        ) : workspaceMode === "team" && activeView === "calendar" ? (
           <section className="board-scroll" aria-label={labels.calendar}>
             <CalendarView
               cards={filteredCards}
@@ -1350,7 +1591,7 @@ export default function BoardPage() {
               labels={labels}
             />
           </section>
-        ) : activeView === "progress" ? (
+        ) : workspaceMode === "team" && activeView === "progress" ? (
           <section className="board-scroll" aria-label={labels.progress}>
             <ProgressView
               cards={filteredCards}
@@ -1361,7 +1602,7 @@ export default function BoardPage() {
               labels={labels}
             />
           </section>
-        ) : (
+        ) : workspaceMode === "team" ? (
           <DragDropProvider onDragEnd={finishDrag}>
             <section
               className={`board-scroll${normalizedSearch ? " is-filtering" : ""}${activeView === "list" ? " is-list-view" : ""}`}
@@ -1464,7 +1705,7 @@ export default function BoardPage() {
               </div>
             </section>
           </DragDropProvider>
-        )}
+        ) : null}
       </div>
     </main>
   );

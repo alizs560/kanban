@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="fa" dir="rtl" className="h-full antialiased">
+    <html lang="fa" dir="rtl" className="h-full antialiased" data-theme="dark">
       <body className="min-h-full locale-fa">
         <script
           dangerouslySetInnerHTML={{

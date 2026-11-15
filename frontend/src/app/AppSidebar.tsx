@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import {
   Bell,
@@ -20,6 +20,7 @@ import {
   Zap,
 } from "lucide-react";
 import type { BoardState, Locale } from "@/lib/board";
+import { animateDrawerCascade, animateNewMessage } from "@/lib/animations";
 
 export type SidebarTab =
   | "home"
@@ -49,6 +50,26 @@ interface AppSidebarProps {
   onAiAddCard?: (title: string, columnId: string) => void;
 }
 
+function ChatBubble({ msg }: { msg: ChatMessage }) {
+  const bubbleRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    animateNewMessage(bubbleRef.current);
+  }, []);
+
+  return (
+    <div ref={bubbleRef} className="ai-message-bubble">
+      <p className="ai-message-text">{msg.text}</p>
+      {msg.actionTaken && (
+        <div className="ai-action-badge">
+          <CheckCheck size={12} />
+          <span>{msg.actionTaken}</span>
+        </div>
+      )}
+      <span className="ai-message-time">{msg.timestamp}</span>
+    </div>
+  );
+}
+
 export function AppSidebar({
   locale,
   activeTab,
@@ -60,6 +81,13 @@ export function AppSidebar({
   onAiAddCard,
 }: AppSidebarProps) {
   const isRtl = locale === "fa";
+  const drawerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isOpen && drawerRef.current) {
+      animateDrawerCascade(drawerRef.current);
+    }
+  }, [isOpen, activeTab]);
 
   // State for AI interactive chat panel
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -364,7 +392,7 @@ export function AppSidebar({
       </aside>
 
       {/* Flyout Sub-Panel / Drawer */}
-      <div className={`sidebar-drawer${isOpen ? " is-open" : ""}`} aria-hidden={!isOpen}>
+      <div ref={drawerRef} className={`sidebar-drawer${isOpen ? " is-open" : ""}`} aria-hidden={!isOpen}>
         <div className="drawer-header">
           <div className="drawer-title-group">
             {activeTab === "ai" && (
@@ -452,16 +480,7 @@ export function AppSidebar({
                         <Bot size={14} />
                       </div>
                     )}
-                    <div className="ai-message-bubble">
-                      <p className="ai-message-text">{msg.text}</p>
-                      {msg.actionTaken && (
-                        <div className="ai-action-badge">
-                          <CheckCheck size={12} />
-                          <span>{msg.actionTaken}</span>
-                        </div>
-                      )}
-                      <span className="ai-message-time">{msg.timestamp}</span>
-                    </div>
+                    <ChatBubble msg={msg} />
                   </div>
                 ))}
                 {isAiThinking && (

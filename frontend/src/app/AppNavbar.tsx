@@ -8,6 +8,7 @@ import {
   LayoutGrid,
   List,
   LogOut,
+  Moon,
   PanelLeftClose,
   PanelLeftOpen,
   Pencil,
@@ -16,7 +17,9 @@ import {
   Share2,
   ShieldCheck,
   Sparkles,
+  Sun,
   Trash2,
+  UserRound,
   X,
 } from "lucide-react";
 import {
@@ -26,7 +29,9 @@ import {
   type Phase,
   type PhaseId,
 } from "@/lib/board";
-import type { BoardView, Copy } from "./page";
+import type { BoardView, Copy, WorkspaceMode } from "./page";
+
+export type Theme = "light" | "dark";
 
 interface AppNavbarProps {
   locale: Locale;
@@ -48,6 +53,10 @@ interface AppNavbarProps {
   isSidebarOpen: boolean;
   onToggleSidebar: (open?: boolean) => void;
   onOpenAi: () => void;
+  workspaceMode: WorkspaceMode;
+  onWorkspaceModeChange: (mode: WorkspaceMode) => void;
+  theme: Theme;
+  onThemeChange: (theme: Theme) => void;
 }
 
 export function AppNavbar({
@@ -70,6 +79,10 @@ export function AppNavbar({
   isSidebarOpen,
   onToggleSidebar,
   onOpenAi,
+  workspaceMode,
+  onWorkspaceModeChange,
+  theme,
+  onThemeChange,
 }: AppNavbarProps) {
   const isRtl = locale === "fa";
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -163,6 +176,17 @@ export function AppNavbar({
             <span>{locale === "fa" ? "هوش مصنوعی" : "AI Copilot"}</span>
           </button>
 
+          <button
+            type="button"
+            className={`navbar-mode-toggle${workspaceMode === "solo" ? " is-solo" : ""}`}
+            onClick={() => onWorkspaceModeChange(workspaceMode === "team" ? "solo" : "team")}
+            aria-pressed={workspaceMode === "solo"}
+            title={workspaceMode === "team" ? labels.soloModeHint : labels.teamMode}
+          >
+            <UserRound size={14} aria-hidden="true" />
+            <span>{workspaceMode === "team" ? labels.soloMode : labels.teamMode}</span>
+          </button>
+
           {/* Avatar stack */}
           <div className="navbar-avatar-stack" title={locale === "fa" ? "اعضای فعال در پروژه" : "Active project members"}>
             <img
@@ -206,6 +230,25 @@ export function AppNavbar({
               EN
             </button>
           </div>
+
+          <button
+            type="button"
+            className="navbar-theme-toggle"
+            onClick={() => onThemeChange(theme === "dark" ? "light" : "dark")}
+            aria-label={
+              theme === "dark"
+                ? (locale === "fa" ? "تغییر به حالت روز" : "Switch to light mode")
+                : (locale === "fa" ? "تغییر به حالت شب" : "Switch to dark mode")
+            }
+            aria-pressed={theme === "dark"}
+            title={
+              theme === "dark"
+                ? (locale === "fa" ? "حالت شب فعال است" : "Dark mode is active")
+                : (locale === "fa" ? "حالت روز فعال است" : "Light mode is active")
+            }
+          >
+            {theme === "dark" ? <Moon size={16} aria-hidden="true" /> : <Sun size={16} aria-hidden="true" />}
+          </button>
 
           {/* Sign Out */}
           <button
