@@ -35,6 +35,12 @@ uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 Access the application at `http://localhost:8000` and API docs at `http://localhost:8000/api/docs`.
 
+Run backend tests with:
+
+```bash
+uv run --group dev python -m unittest discover -s tests -v
+```
+
 ## Running in Docker
 
 From the project root:
